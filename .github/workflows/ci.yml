@@ -13,6 +13,9 @@ jobs:
     steps:
     - name: 📥 Checkout code
       uses: actions/checkout@v3
+      
+    - name: 🔐 Scan for Secrets
+      uses: trufflesecurity/trufflehog@main
 
     - name: 🧰 Set up .NET
       uses: actions/setup-dotnet@v4
@@ -22,10 +25,14 @@ jobs:
     - name: 🛠 Restore and build .NET
       run: |
         dotnet restore ./src/AiSummarizer.sln
-        dotnet build ./src/AiSummarizer.sln --no-restore --configuration Release
+        dotnet build ./src/AiSummarizer.sln --no-restore --configuration Release       
 
     - name: ✅ Run Tests
       run: dotnet test ./src/Summarizer.Tests/Summarizer.Tests.csproj
+     
+    - name: 📊 Collect Code Coverage
+      run: |
+        dotnet test ./src/Summarizer.Tests/Summarizer.Tests.csproj --collect:"XPlat Code Coverage"
 
     - name: 🏗️ Set up Terraform
       uses: hashicorp/setup-terraform@v3
@@ -38,3 +45,10 @@ jobs:
       run: |
         terraform init -backend=false
         terraform validate 
+        
+    - name: 📊 Terraform Plan (Dev)
+      working-directory: ./infra/envs/dev
+      run: |
+        terraform init -backend=false
+        terraform plan -input=false
+
