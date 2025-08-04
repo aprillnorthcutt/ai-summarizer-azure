@@ -1,3 +1,7 @@
+![CI](https://github.com/aprillnorthcutt/ai-summarizer-azure/actions/workflows/ci.yml/badge.svg)
+
+---
+
 # 🧠 AI-Powered Document Summarizer (Azure + .NET + Terraform)
 
 This project demonstrates how to deliver an intelligent document summarization web app using **Azure Cognitive Services**, a custom **.NET Core API**, and **infrastructure-as-code with Terraform**.  
