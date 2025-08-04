@@ -37,4 +37,4 @@ jobs:
       working-directory: ./infra/envs/dev
       run: |
         terraform init -backend=false
-        terraform validate
+        terraform validate 
