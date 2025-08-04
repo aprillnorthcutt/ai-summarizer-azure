@@ -1,0 +1,33 @@
+# ────────────────
+# .NET Build Artifacts
+# ────────────────
+bin/
+obj/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# ────────────────
+# Terraform Files
+# ────────────────
+*.tfstate
+*.tfstate.*
+.terraform/
+terraform.tfvars
+crash.log
+.terraform.lock.hcl
+
+# ────────────────
+# Logs & System Files
+# ────────────────
+*.log
+*.DS_Store
+*.vscode/
+
+# ────────────────
+# Secrets / Credentials (ensure you use ENV or Key Vault instead!)
+# ────────────────
+*.pem
+*.key
+*.crt
