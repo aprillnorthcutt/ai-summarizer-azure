@@ -1,0 +1,8 @@
+resource_group_name     = "core-mvc-dev-rg"
+app_service_plan_name   = "core-mvc-dev-plan"
+app_service_name        = "core-mvc-dev-app"
+
+tags = {
+  environment = "dev"
+}
+
