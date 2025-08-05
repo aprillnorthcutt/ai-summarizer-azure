@@ -7,7 +7,18 @@ variable "tags" {
   }
 }
 
+variable "app_service_name" {
+  type = string
+}
+
+variable "resource_group_name" {
+  type = string
+}
+
+variable "tags" {
+  type = map(string)
+}
+
 variable "location" {
-  type        = string
-  description = "Azure region where resources will be deployed"
+  type = string
 }
