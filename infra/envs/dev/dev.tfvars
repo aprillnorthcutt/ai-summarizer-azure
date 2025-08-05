@@ -1,7 +1,7 @@
-resource_group_name   = "core-mvc-dev-rg"
-app_service_plan_name = "core-mvc-dev-plan"
-app_service_name      = "core-mvc-dev-app"
-location              = "East US 2"
+resource_group_name     = "rg-summarizer-dev"
+app_service_plan_name   = "asp-summarizer-dev"
+app_service_name        = "summarizer-api-dev"
+location                = "centralus"
 
 tags = {
   environment = "dev"
