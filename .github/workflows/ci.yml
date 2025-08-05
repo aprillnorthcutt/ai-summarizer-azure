@@ -48,7 +48,12 @@ jobs:
         
     - name: 📊 Terraform Plan (Dev)
       working-directory: ./infra/envs/dev
+      env:
+        ARM_CLIENT_ID: ${{ secrets.ARM_CLIENT_ID }}
+        ARM_CLIENT_SECRET: ${{ secrets.ARM_CLIENT_SECRET }}
+        ARM_SUBSCRIPTION_ID: ${{ secrets.ARM_SUBSCRIPTION_ID }}
+        ARM_TENANT_ID: ${{ secrets.ARM_TENANT_ID }}
       run: |
         terraform init -backend=false
-        terraform plan -input=false
+        terraform plan -input=false -var-file=dev.tfvars
 
