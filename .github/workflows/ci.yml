@@ -50,5 +50,5 @@ jobs:
       working-directory: ./infra/envs/dev
       run: |
         terraform init -backend=false
-        terraform plan -input=false
+        terraform plan -input=false -var-file=dev.tfvars
 

@@ -17,6 +17,8 @@ obj/
 terraform.tfvars
 crash.log
 .terraform.lock.hcl
+*.tfvars
+*.auto.tfvars
 
 # ────────────────
 # Logs & System Files
