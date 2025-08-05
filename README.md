@@ -50,21 +50,14 @@ ai-summarizer-azure/
 
 ---
 
-## 🚀 Manual Deployment (Terraform)
 
-To deploy infrastructure locally:
+## 📦 Infrastructure Deployment (Terraform + Azure)
 
-```bash
-cd infra
-terraform init
-terraform apply
-```
+This project supports deploying infrastructure via:
+- 💻 Local CLI with Azure login
+- ☁️ GitHub Actions (CI/CD)
 
-To tear down and avoid Azure costs:
-
-```bash
-terraform destroy
-```
+➡️ [Click here for the full deployment guide](infra/DEPLOYMENT.md)
 
 ---
 
