@@ -11,7 +11,7 @@ This folder contains Terraform configuration to deploy the infrastructure needed
 
 ## 📁 Directory Structure
 
-```bash
+```
 infra/
 ├── envs/
 │   └── dev/
@@ -27,14 +27,14 @@ infra/
 
 ⚠️ Never hardcode or commit sensitive values like subscription ID, tenant ID, or client secrets.
 
-Instead, **use GitHub Secrets** for CI/CD or `-var` CLI arguments locally:
+Instead, use GitHub Secrets for CI/CD or `-var` CLI arguments locally:
 
-| Terraform Variable   | Source                   |
-|----------------------|--------------------------|
-| `subscription_id`    | GitHub Secret: `ARM_SUBSCRIPTION_ID` or CLI var |
-| `tenant_id`          | GitHub Secret: `ARM_TENANT_ID` or CLI var |
-| `client_id`          | GitHub Secret: `ARM_CLIENT_ID` or CLI var |
-| `client_secret`      | GitHub Secret: `ARM_CLIENT_SECRET` or CLI var |
+| Terraform Variable | Source                                          |
+| ------------------ | ----------------------------------------------- |
+| `subscription_id`  | GitHub Secret: `ARM_SUBSCRIPTION_ID` or CLI var |
+| `tenant_id`        | GitHub Secret: `ARM_TENANT_ID` or CLI var       |
+| `client_id`        | GitHub Secret: `ARM_CLIENT_ID` or CLI var       |
+| `client_secret`    | GitHub Secret: `ARM_CLIENT_SECRET` or CLI var   |
 
 ---
 
@@ -66,18 +66,18 @@ terraform apply \
 
 When a commit is pushed to `main` or a pull request is opened:
 
-- `.NET project` is restored, built, and tested
-- `Terraform` is validated and planned (dev only)
+- .NET project is restored, built, and tested
+- Terraform is validated and planned (dev only)
 - Secrets are injected securely via `env` block in the CI job
 
-Ensure your repository has the following secrets set:
+# Ensure your repository has the following secrets set:
 
-```plaintext
-ARM_SUBSCRIPTION_ID
-ARM_TENANT_ID
-ARM_CLIENT_ID
-ARM_CLIENT_SECRET
-```
+- `ARM_SUBSCRIPTION_ID`
+- `ARM_TENANT_ID`
+- `ARM_CLIENT_ID`
+- `ARM_CLIENT_SECRET`
+
+> # 🔐 To enable this, a **Service Principal** must be created and assigned the **Contributor** role on your subscription.
 
 ---
 
