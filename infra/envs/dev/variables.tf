@@ -7,18 +7,32 @@ variable "tags" {
   }
 }
 
-variable "app_service_name" {
-  type = string
+variable "subscription_id" {
+  description = "Azure Subscription ID"
+  type        = string
 }
 
-variable "resource_group_name" {
-  type = string
-}
-
-variable "tags" {
-  type = map(string)
+variable "tenant_id" {
+  description = "Azure Tenant ID"
+  type        = string
 }
 
 variable "location" {
-  type = string
+  description = "Azure Region"
+  type        = string
+}
+
+variable "resource_group_name" {
+  description = "Name of the Resource Group"
+  type        = string
+}
+
+variable "app_service_plan_name" {
+  description = "App Service Plan name"
+  type        = string
+}
+
+variable "app_service_name" {
+  description = "App Service name"
+  type        = string
 }

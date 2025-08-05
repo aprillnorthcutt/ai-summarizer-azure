@@ -1,25 +1,27 @@
 provider "azurerm" {
   features {}
+
+  subscription_id = var.subscription_id
+  tenant_id       = var.tenant_id
 }
 
 resource "azurerm_resource_group" "rg" {
-  name     = "rg-summarizer-dev"
+  name     = var.resource_group_name
   location = var.location
   tags     = var.tags
 }
 
 resource "azurerm_service_plan" "app_plan" {
-  name                = "asp-summarizer-dev"
+  name                = var.app_service_plan_name
   resource_group_name = azurerm_resource_group.rg.name
   location            = azurerm_resource_group.rg.location
-  os_type             = "Linux" # or "Windows"
+  os_type             = "Linux"
   sku_name            = "B1"
   tags                = var.tags
 }
 
-
 resource "azurerm_linux_web_app" "web_app" {
-  name                = "summarizer-api-dev"
+  name                = var.app_service_name
   location            = azurerm_resource_group.rg.location
   resource_group_name = azurerm_resource_group.rg.name
   service_plan_id     = azurerm_service_plan.app_plan.id
@@ -36,4 +38,3 @@ resource "azurerm_linux_web_app" "web_app" {
 
   tags = var.tags
 }
-
