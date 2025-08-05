@@ -7,7 +7,7 @@ provider "azurerm" {
 resource "azurerm_resource_group" "rg" {
   name     = "rg-summarizer-dev"
   location = var.location
-  tags = var.tags
+  tags     = var.tags
 }
 
 resource "azurerm_service_plan" "app_plan" {
