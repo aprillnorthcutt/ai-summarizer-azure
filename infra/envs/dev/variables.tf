@@ -26,3 +26,11 @@ variable "app_service_name" {
   description = "App Service name"
   type        = string
 }
+
+variable "subscription_id" {
+  type = string
+}
+
+variable "tenant_id" {
+  type = string
+}
