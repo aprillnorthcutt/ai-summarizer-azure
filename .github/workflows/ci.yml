@@ -56,6 +56,6 @@ jobs:
         TF_VAR_subscription_id: ${{ secrets.ARM_SUBSCRIPTION_ID }}
         TF_VAR_tenant_id: ${{ secrets.ARM_TENANT_ID }}
       run: |
-        terraform init -backend=false
+        terraform init -reconfigure
         terraform plan -input=false -var-file=dev.tfvars
 
