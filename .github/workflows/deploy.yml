@@ -13,7 +13,7 @@ jobs:
 
     defaults:
       run:
-        working-directory: ./infra/envs/dev
+        working-directory: ./infra/envs/dev 
 
     env:
       ARM_CLIENT_ID: ${{ secrets.ARM_CLIENT_ID }}
