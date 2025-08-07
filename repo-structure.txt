@@ -1,0 +1,132 @@
+Folder PATH listing for volume Windows
+Volume serial number is FC74-99F0
+C:.
+¦   .gitignore
+¦   infra.zip
+¦   README.md
+¦   repo-structure.txt
+¦   terraform.tfstate
+¦   
++---.github
+¦   +---workflows
+¦           ci.yml
+¦           deploy.yml
+¦           
++---docs
+¦       GitHub Repo to Azure diagram.png
+¦       Local to Azure Setup.png
+¦       
++---infra
+¦   ¦   .gitkeep
+¦   ¦   .terraform.lock.hcl
+¦   ¦   archivedtfs.zip
+¦   ¦   DEPLOYMENT.md
+¦   ¦   dev.tfvars
+¦   ¦   README.md
+¦   ¦   terraform.tfstate
+¦   ¦   
+¦   +---.terraform
+¦   ¦   ¦   environment
+¦   ¦   ¦   
+¦   ¦   +---providers
+¦   ¦       +---registry.terraform.io
+¦   ¦           +---hashicorp
+¦   ¦               +---azurerm
+¦   ¦               ¦   +---4.38.1
+¦   ¦               ¦       +---windows_amd64
+¦   ¦               ¦               LICENSE.txt
+¦   ¦               ¦               terraform-provider-azurerm_v4.38.1_x5.exe
+¦   ¦               ¦               
+¦   ¦               +---random
+¦   ¦                   +---3.7.2
+¦   ¦                       +---windows_amd64
+¦   ¦                               LICENSE.txt
+¦   ¦                               terraform-provider-random_v3.7.2_x5.exe
+¦   ¦                               
+¦   +---envs
+¦   ¦   +---dev
+¦   ¦   ¦   ¦   .terraform.lock.hcl
+¦   ¦   ¦   ¦   backend.tf
+¦   ¦   ¦   ¦   create-tf-backend.sh
+¦   ¦   ¦   ¦   dev.tfvars
+¦   ¦   ¦   ¦   main.tf
+¦   ¦   ¦   ¦   outputs.tf
+¦   ¦   ¦   ¦   set-env.sh
+¦   ¦   ¦   ¦   terraform.tfstate
+¦   ¦   ¦   ¦   terraform.tfstate.backup
+¦   ¦   ¦   ¦   terraform.tfvars
+¦   ¦   ¦   ¦   variables.tf
+¦   ¦   ¦   ¦   
+¦   ¦   ¦   +---.terraform
+¦   ¦   ¦       ¦   terraform.tfstate
+¦   ¦   ¦       ¦   
+¦   ¦   ¦       +---providers
+¦   ¦   ¦           +---registry.terraform.io
+¦   ¦   ¦               +---hashicorp
+¦   ¦   ¦                   +---azurerm
+¦   ¦   ¦                       +---4.38.1
+¦   ¦   ¦                           +---windows_amd64
+¦   ¦   ¦                                   LICENSE.txt
+¦   ¦   ¦                                   terraform-provider-azurerm_v4.38.1_x5.exe
+¦   ¦   ¦                                   
+¦   ¦   +---prod
+¦   ¦   ¦       main.tf
+¦   ¦   ¦       terraform.tfvars
+¦   ¦   ¦       variables.tf
+¦   ¦   ¦       
+¦   ¦   +---test
+¦   ¦           main.tf
+¦   ¦           terraform.tfvars
+¦   ¦           variables.tf
+¦   ¦           
+¦   +---modules
+¦   ¦   +---app_service
+¦   ¦   +---storage
+¦   +---terraform.tfstate.d
+¦   ¦   +---dev
+¦   ¦           terraform.tfstate
+¦   ¦           terraform.tfstate.backup
+¦   ¦           
+¦   +---_archive
+¦           ai.tf
+¦           app_service.tf
+¦           main.tf
+¦           outputs.tf
+¦           storage.tf
+¦           variables.tf
+¦           
++---pipelines
+¦       azure-pipeline.yml
+¦       terraform-deploy.yml
+¦       
++---src
+    ¦   AiSummarizer.sln
+    ¦   
+    +---Summarizer.Api
+    ¦   ¦   appsettings.Development.json
+    ¦   ¦   appsettings.json
+    ¦   ¦   Program.cs
+    ¦   ¦   Summarizer.Api.csproj
+    ¦   ¦   Summarizer.Api.http
+    ¦   ¦   
+    ¦   +---obj
+    ¦   ¦       project.assets.json
+    ¦   ¦       project.nuget.cache
+    ¦   ¦       Summarizer.Api.csproj.nuget.dgspec.json
+    ¦   ¦       Summarizer.Api.csproj.nuget.g.props
+    ¦   ¦       Summarizer.Api.csproj.nuget.g.targets
+    ¦   ¦       
+    ¦   +---Properties
+    ¦           launchSettings.json
+    ¦           
+    +---Summarizer.Tests
+        ¦   Summarizer.Tests.csproj
+        ¦   UnitTest1.cs
+        ¦   
+        +---obj
+                project.assets.json
+                project.nuget.cache
+                Summarizer.Tests.csproj.nuget.dgspec.json
+                Summarizer.Tests.csproj.nuget.g.props
+                Summarizer.Tests.csproj.nuget.g.targets
+                
