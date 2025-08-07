@@ -1,0 +1,52 @@
+# 👇 Temporarily disabled this workflow. To re-enable, uncomment the `on:` block.
+# name: CI – Terraform
+
+# on:
+#   push:
+#     branches: [main]
+#     paths:
+#       - 'infra/**'
+#   pull_request:
+#     branches: [main]
+#     paths:
+#       - 'infra/**'
+
+jobs:
+  terraform-validate-and-plan:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: 📥 Checkout code
+      uses: actions/checkout@v3
+
+    - name: 🏗️ Set up Terraform
+      uses: hashicorp/setup-terraform@v3
+
+    - name: 📏 Terraform Format Check
+      run: find ./infra -type f -name "*.tf" ! -path "*_archive*" -exec terraform fmt -check {} +
+
+    - name: 🔍 Terraform Validate (Dev)
+      working-directory: ./infra/envs/dev
+      run: |
+        terraform init -reconfigure
+        terraform validate 
+      env:
+        ARM_CLIENT_ID: ${{ secrets.ARM_CLIENT_ID }}
+        ARM_CLIENT_SECRET: ${{ secrets.ARM_CLIENT_SECRET }}
+        ARM_SUBSCRIPTION_ID: ${{ secrets.ARM_SUBSCRIPTION_ID }}
+        ARM_TENANT_ID: ${{ secrets.ARM_TENANT_ID }}
+        TF_VAR_subscription_id: ${{ secrets.ARM_SUBSCRIPTION_ID }}
+        TF_VAR_tenant_id: ${{ secrets.ARM_TENANT_ID }}
+
+    - name: 📊 Terraform Plan (Dev)
+      working-directory: ./infra/envs/dev
+      run: |
+        terraform init -reconfigure
+        terraform plan -input=false -var-file=dev.tfvars
+      env:
+        ARM_CLIENT_ID: ${{ secrets.ARM_CLIENT_ID }}
+        ARM_CLIENT_SECRET: ${{ secrets.ARM_CLIENT_SECRET }}
+        ARM_SUBSCRIPTION_ID: ${{ secrets.ARM_SUBSCRIPTION_ID }}
+        ARM_TENANT_ID: ${{ secrets.ARM_TENANT_ID }}
+        TF_VAR_subscription_id: ${{ secrets.ARM_SUBSCRIPTION_ID }}
+        TF_VAR_tenant_id: ${{ secrets.ARM_TENANT_ID }}
