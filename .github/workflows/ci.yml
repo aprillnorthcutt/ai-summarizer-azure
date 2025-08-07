@@ -43,7 +43,7 @@ jobs:
     - name: 🔍 Terraform Validate (Dev)
       working-directory: ./infra/envs/dev
       run: |
-        terraform init -backend=false
+        terraform init -reconfigure
         terraform validate 
         
     - name: 📊 Terraform Plan (Dev)
