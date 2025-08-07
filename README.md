@@ -1,4 +1,5 @@
-![CI Status](https://github.com/aprillnorthcutt/ai-summarizer-azure/actions/workflows/ci.yml/badge.svg)
+![CI .Net Status](https://github.com/aprillnorthcutt/ai-summarizer-azure/actions/workflows/ci-dotnet.yml/badge.svg)
+![CI Terraform Status](https://github.com/aprillnorthcutt/ai-summarizer-azure/actions/workflows/ci-terraform.yml/badge.svg)
 ![Status: In Progress](https://img.shields.io/badge/status-in--progress-yellow)
 ![Terraform Version](https://img.shields.io/badge/Terraform-1.6.6-blue)
 
@@ -61,7 +62,7 @@ You can deploy infrastructure either locally or via GitHub Actions:
 - 💻 **Local CLI**: Use `terraform init` and `terraform apply` with environment-specific tfvars  
 - ☁️ **GitHub Actions**: On push or PR, run workflows defined in `.github/workflows`
 
-📁 [View the full deployment guide](docs/DEPLOYMENT-GUIDE.md)
+📁 [View the full deployment guide](docs/Deployment-guide.md)
 
 ---
 
@@ -69,10 +70,12 @@ You can deploy infrastructure either locally or via GitHub Actions:
 
 ### ✅ GitHub Actions
 - Auto-plan/apply Terraform from PRs or commits  
-- Secrets managed via GitHub repository settings  
-- [View workflow file](.github/workflows/ci.yml)
+- Secrets managed via GitHub repository settings 
+- Split into 2 files for maintaiability between Terraform and App code. 
+- [View CI .Net workflow file](.github/workflows/ci-dotnet.yml)
+- [View CI Terraform workflow file](.github/workflows/ci-terraform.yml)
 
-### ✅ Azure DevOps (Optional)
+### ✅ Azure DevOps (In Progress)
 - [pipelines/azure-pipeline.yml](pipelines/azure-pipeline.yml) provides a sample deploy pipeline  
 - Can be imported directly into Azure DevOps
 
@@ -91,10 +94,10 @@ You can deploy infrastructure either locally or via GitHub Actions:
 
 ## 📘 Project Journey Docs
 
-- [CI/CD + GitHub Flow](docs/GIT-GITHUB-CICD-JOURNEY.md)
-- [Azure Infrastructure Setup](docs/AZURE-INFRA-SETUP.md)
-- [Deployment Guide](docs/DEPLOYMENT-GUIDE.md)
-- [Architecture Diagram](docs/Local%20to%20Azure%20Setup.png)
+- [CI/CD + GitHub Flow](docs/GIT-GITHUB-CICD-JOURNEY.png)
+- [Azure Infrastructure Setup](docs/AZURE-INFRA-SETUP.png)
+- [Deployment Guide](docs/Deployment-guide.md)
+- [Architecture Diagram](docs/Azure%20Local%20Setup.png)
 
 ---
 

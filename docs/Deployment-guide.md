@@ -1,214 +1,222 @@
-🚀 Deployment Guide (Terraform + Azure + GitHub Actions)
+# 🧠 AI-Powered Document Summarizer – Infrastructure Deployment Guide
 
-This project supports deploying Azure infrastructure for the AI-Powered Document Summarizer using modular Terraform, a service principal, and CI/CD workflows.
+This project provisions Azure infrastructure for the **AI-Powered Document Summarizer** using **Terraform**, a secure **service principal**, and **CI/CD workflows via GitHub Actions**.
 
-You can deploy infrastructure via:
+You can deploy infrastructure using either:
 
-💻 Local CLI with Azure login and environment variables
+- 💻 **Local CLI** with Azure authentication  
+- ☁️ **GitHub Actions** using securely stored secrets and automated pipelines  
 
-☁️ GitHub Actions using securely stored secrets and pipelines
+Whether you're just starting with Terraform or scaling enterprise DevOps, this guide shows how to get started and grow with confidence.
 
-Whether you're new to Terraform or building enterprise-grade DevOps, this guide shows how to get started and scale.
+---
 
-🧱 What Infrastructure is Provisioned
+## 🧱 What Terraform Provisions
 
-Terraform modules under /infra/ provision:
+Terraform modules under `/infra/` provision:
 
-Azure Resource Group
+- 🔹 Azure Resource Group  
+- 🔹 App Service Plan (Linux, cost-optimized)  
+- 🔹 Azure App Service (for .NET Web App)  
+- 🔹 Azure Cognitive Services (or Azure OpenAI)  
+- 🔹 Optional: Networking, identity, tagging (e.g., `environment = dev`)  
+- 🔹 Optional: Remote state backend (via `backend.tf`)
 
-App Service Plan (Linux, cost-optimized)
+---
 
-Azure App Service for .NET
+## 💻 Local Deployment (Terraform CLI)
 
-Azure Cognitive Services (or OpenAI)
+### ✅ 1. Prerequisites
 
-Optional: Networking, identity, and tagging (e.g., environment = dev)
+| Tool         | Purpose                   | Install Link |
+|--------------|---------------------------|--------------|
+| Azure CLI    | Authenticate to Azure     | [Install](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli) |
+| Terraform    | Deploy infrastructure     | [Install](https://developer.hashicorp.com/terraform/downloads)          |
 
-💻 Local Deployment (Terraform CLI)
+Login to Azure:
 
-✅ Prerequisites
-
-Tool
-
-Purpose
-
-Install Link
-
-Azure CLI
-
-Authenticate to Azure
-
-Install
-
-Terraform
-
-Deploy infrastructure code
-
-Install
-
-Run login:
-
+```bash
 az login
+```
 
-🔐 Set Required Environment Variables
+---
 
-You’ll need your Azure Subscription ID, Tenant ID, and Service Principal credentials.
+### 📋 2. Get Required Azure Info
 
+```bash
+az account show --query id -o tsv         # Subscription ID
+az account show --query tenantId -o tsv   # Tenant ID
+```
+
+---
+
+### 🔐 3. Set Environment Variables
+
+You’ll need your Azure subscription, tenant ID, and service principal credentials:
+
+```bash
 export TF_VAR_subscription_id="<your-subscription-id>"
 export TF_VAR_tenant_id="<your-tenant-id>"
 export TF_VAR_client_id="<your-app-client-id>"
 export TF_VAR_client_secret="<your-app-client-secret>"
+```
 
-✅ Or use a helper script:
+Or use the helper script:
 
+```bash
 source infra/envs/dev/set-env.sh
+```
 
-🚀 Run Terraform
+---
 
-From the dev environment folder:
+### 🚀 4. Deploy the Infrastructure
 
+```bash
 cd infra/envs/dev
 terraform init
 terraform plan -var-file="dev.tfvars"
 terraform apply -var-file="dev.tfvars"
+```
 
-☁️ GitHub Actions Deployment (CI/CD)
+---
 
-This project includes a GitHub Actions workflow that automatically validates and plans Terraform code on every push or PR.
+## ☁️ GitHub Actions Deployment (CI/CD)
 
-📄 Workflow file: .github/workflows/ci.yml
+This project uses **two GitHub Actions workflows**:
 
-🔐 Set GitHub Secrets
+- 📄 `.github/workflows/ci-terraform.yml` – Validates and plans Terraform infrastructure
+- 📄 `.github/workflows/ci-dotnet.yml` – Builds and deploys the .NET web application
 
-Go to your GitHub repo:
-Settings → Secrets and variables → Actions → Secrets
+---
 
-Add these secrets:
+### 🔐 1. Set GitHub Secrets
 
-Secret Name
+Go to:  
+**Repo → Settings → Secrets and variables → Actions → Secrets**
 
-Description
+| Secret Name             | Description                          |
+|-------------------------|--------------------------------------|
+| `ARM_CLIENT_ID`         | Azure service principal ID           |
+| `ARM_CLIENT_SECRET`     | Azure service principal password     |
+| `ARM_SUBSCRIPTION_ID`   | Azure subscription ID                |
+| `ARM_TENANT_ID`         | Azure tenant ID                      |
 
-ARM_CLIENT_ID
+These secrets map into Terraform variables automatically.
 
-Azure service principal ID
+---
 
-ARM_CLIENT_SECRET
+### 🚀 2. Trigger Terraform CI/CD
 
-Azure service principal password
-
-ARM_SUBSCRIPTION_ID
-
-Your Azure subscription ID
-
-ARM_TENANT_ID
-
-Your Azure tenant ID
-
-These secrets are automatically mapped into Terraform variables by the GitHub Actions environment.
-
-✅ Trigger CI/CD
-
-To run the workflow:
-
+```bash
 git checkout -b feature/infra-update
 git commit -am "Update Terraform config"
 git push origin feature/infra-update
+```
 
-GitHub Actions will:
+`ci-terraform.yml` will:
 
-✅ Lint and validate .tf files
+- ✅ Lint and validate `.tf` files  
+- ✅ Run `terraform init`, `validate`, and `plan`  
+- ✅ (Optional) Run `apply` if configured
 
-✅ Run terraform init, validate, and plan
+---
 
-✅ (Optional) Run apply if automation is enabled
+### 🚀 3. Trigger .NET App CI/CD
 
-You can monitor progress under the Actions tab in GitHub.
+```bash
+git checkout -b feature/app-deploy
+git commit -am "Update .NET web app"
+git push origin feature/app-deploy
+```
 
-🔍 CI/CD Highlights
+`ci-dotnet.yml` will:
 
-Stage
+- ✅ Build and test the .NET app  
+- ✅ Deploy to Azure App Service
 
-Local CLI
+---
 
-GitHub Actions (CI/CD)
+## 🔍 CI/CD Highlights
 
-Auth
+| Task                         | Local CLI             | GitHub Actions CI/CD         |
+|------------------------------|-----------------------|------------------------------|
+| Authentication               | `az login` + env vars | GitHub secrets               |
+| Set subscription + tenant    | `TF_VAR_...` manually | Auto-mapped from secrets     |
+| Plan infrastructure changes  | `terraform plan`      | Auto-run on push             |
+| Apply infrastructure         | `terraform apply`     | Optional (safe by default)   |
+| Deploy app code              | Manual/CLI            | Auto-run via `ci-dotnet.yml` |
 
-az login
+> ⚠️ Infrastructure CI runs `terraform plan` only by default — to avoid unintentional costs.
 
-GitHub Secrets (SP creds)
+---
 
-Set Environment Vars
+## 🧯 Troubleshooting
 
-export TF_VAR_...
+| Problem                               | Solution |
+|---------------------------------------|----------|
+| `subscription_id` or `tenant_id` not set | Ensure you exported `TF_VAR_` env vars |
+| `az` not found                        | Install Azure CLI |
+| Terraform fails after restart         | Re-run `az login` and re-export env vars |
+| CI/CD job fails                       | Check GitHub secrets or missing tfvars |
 
-Auto-injected from secrets
+---
 
-Plan Infra Changes
+## 🧪 Dev/Test/Prod Environment Support
 
-terraform plan
+Terraform environments are separated under `/infra/envs/`, each with its own configuration:
 
-Auto-runs on PR or push
-
-Apply Infra
-
-terraform apply
-
-Optional (manual/auto)
-
-⚠️ CI/CD currently performs terraform plan, not apply, by default. This is intentional for safety and cost control.
-
-🧯 Troubleshooting
-
-Problem
-
-Solution
-
-subscription_id or tenant_id missing
-
-Export TF_VAR env vars correctly
-
-az not found
-
-Install Azure CLI
-
-Plan fails after restart
-
-Re-run az login + reset variables
-
-CI/CD job fails
-
-Check GitHub secrets or missing tfvars
-
-🧪 Dev/Test/Prod Support
-
-Each environment (dev, test, prod) is structured as a separate folder under /infra/envs/, with its own:
-
-main.tf
-
-variables.tf
-
-terraform.tfvars
-
-Optional: backend.tf for remote state
-
-This enables environment isolation, consistent tagging, and staged rollouts.
-
+```
 infra/
 ├── envs/
 │   ├── dev/
+│   │   ├── main.tf
+│   │   ├── variables.tf
+│   │   ├── dev.tfvars
+│   │   └── set-env.sh
 │   ├── test/
 │   └── prod/
+```
 
-✅ Summary
+This supports isolated deployments, consistent tagging, and safer staged rollouts.
 
-Supports manual CLI and automated CI/CD Terraform deployment
+---
 
-Uses Azure service principal for secure non-interactive auth
+## ✅ Summary
 
-Leverages GitHub Actions for repeatable, auditable workflows
+- ✅ Supports **manual CLI** and **automated GitHub Actions** infrastructure deployment
+- ✅ Uses **Azure service principal** for secure non-interactive authentication
+- ✅ CI/CD is split by concern: infra (`ci-terraform.yml`) vs app (`ci-dotnet.yml`)
+- ✅ Designed for multi-environment pipelines: **dev**, **test**, **prod**
 
-Designed for easy expansion to multiple environments and full pipelines
+> 💡 Test infrastructure locally, promote via pull requests, and deploy with confidence. This setup is safe, scalable, and DevOps-ready.
 
-💡 This setup makes it easy to test infra locally and promote changes via pull requests with confidence — cloud deployments made safe, scalable, and DevOps-ready.
+
+---
+
+## 🔄 Coming Soon: Full DevOps Pipeline
+
+This project will soon include a robust DevOps pipeline integrating:
+
+- ✅ Infrastructure provisioning via Terraform
+- ✅ Application build and deploy via GitHub Actions
+- 🔜 **CI/CD pipeline integration with Azure DevOps (YAML-based)**
+- 🔜 **Multi-stage release pipeline with approvals**
+- 🔜 **Monitoring and observability using Application Insights**
+- 🔜 **Automated rollback on deployment failure**
+- 🔜 **Key Vault integration for secret management**
+
+Stay tuned! 🚀
+
+---
+
+## 📁 Planned DevOps Folder Structure
+
+```
+.devops/
+├── pipelines/
+│   ├── build-app.yml
+│   ├── release-app.yml
+│   └── terraform-deploy.yml
+├── templates/
+│   └── azure-app-service-template.json
+```
