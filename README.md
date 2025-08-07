@@ -1,4 +1,5 @@
-![CI Status](https://github.com/aprillnorthcutt/ai-summarizer-azure/actions/workflows/ci.yml/badge.svg)
+![CI .Net Status](https://github.com/aprillnorthcutt/ai-summarizer-azure/actions/workflows/ci-dotnet.yml/badge.svg)
+![CI Terraform Status](https://github.com/aprillnorthcutt/ai-summarizer-azure/actions/workflows/ci-terraform.yml/badge.svg)
 ![Status: In Progress](https://img.shields.io/badge/status-in--progress-yellow)
 ![Terraform Version](https://img.shields.io/badge/Terraform-1.6.6-blue)
 
@@ -61,7 +62,7 @@ You can deploy infrastructure either locally or via GitHub Actions:
 - 💻 **Local CLI**: Use `terraform init` and `terraform apply` with environment-specific tfvars  
 - ☁️ **GitHub Actions**: On push or PR, run workflows defined in `.github/workflows`
 
-📁 [View the full deployment guide](docs/DEPLOYMENT-guide.md)
+📁 [View the full deployment guide](docs/Deployment-guide.md)
 
 ---
 
@@ -74,7 +75,7 @@ You can deploy infrastructure either locally or via GitHub Actions:
 - [View CI .Net workflow file](.github/workflows/ci-dotnet.yml)
 - [View CI Terraform workflow file](.github/workflows/ci-terraform.yml)
 
-### ✅ Azure DevOps (Optional)
+### ✅ Azure DevOps (In Progress)
 - [pipelines/azure-pipeline.yml](pipelines/azure-pipeline.yml) provides a sample deploy pipeline  
 - Can be imported directly into Azure DevOps
 
@@ -95,7 +96,7 @@ You can deploy infrastructure either locally or via GitHub Actions:
 
 - [CI/CD + GitHub Flow](docs/GIT-GITHUB-CICD-JOURNEY.png)
 - [Azure Infrastructure Setup](docs/AZURE-INFRA-SETUP.png)
-- [Deployment Guide](docs/DEPLOYMENT-guide.md)
+- [Deployment Guide](docs/Deployment-guide.md)
 - [Architecture Diagram](docs/Azure%20Local%20Setup.png)
 
 ---
