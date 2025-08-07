@@ -17,6 +17,10 @@ resource "azurerm_service_plan" "app_plan" {
   os_type             = "Linux"
   sku_name            = "B1"
   tags                = var.tags
+
+  lifecycle {
+    prevent_destroy = true
+  }
 }
 
 resource "azurerm_linux_web_app" "web_app" {
