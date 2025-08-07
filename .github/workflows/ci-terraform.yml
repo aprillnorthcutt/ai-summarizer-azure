@@ -1,43 +1,23 @@
-#name: CI – Build .NET + Validate Terraform
-
 # 👇 Temporarily disabled this workflow. To re-enable, uncomment the `on:` block.
-#on:
-#  push:
-#    branches: [main]
-#    paths:
-#      - 'infra/**'       # Only run Terraform steps if infra changes
-#      - 'src/**'         # Run .NET build/tests if code changes
-# pull_request:
-#    branches: [main]
+# name: CI – Terraform
 
+# on:
+#   push:
+#     branches: [main]
+#     paths:
+#       - 'infra/**'
+#   pull_request:
+#     branches: [main]
+#     paths:
+#       - 'infra/**'
 
 jobs:
-  build-and-validate:
+  terraform-validate-and-plan:
     runs-on: ubuntu-latest
 
     steps:
     - name: 📥 Checkout code
       uses: actions/checkout@v3
-      
-    - name: 🔐 Scan for Secrets
-      uses: trufflesecurity/trufflehog@main
-
-    - name: 🧰 Set up .NET
-      uses: actions/setup-dotnet@v4
-      with:
-        dotnet-version: 8.0.x
-
-    - name: 🛠 Restore and build .NET
-      run: |
-        dotnet restore ./src/AiSummarizer.sln
-        dotnet build ./src/AiSummarizer.sln --no-restore --configuration Release       
-
-    - name: ✅ Run Tests
-      run: dotnet test ./src/Summarizer.Tests/Summarizer.Tests.csproj
-     
-    - name: 📊 Collect Code Coverage
-      run: |
-        dotnet test ./src/Summarizer.Tests/Summarizer.Tests.csproj --collect:"XPlat Code Coverage"
 
     - name: 🏗️ Set up Terraform
       uses: hashicorp/setup-terraform@v3
@@ -57,9 +37,12 @@ jobs:
         ARM_TENANT_ID: ${{ secrets.ARM_TENANT_ID }}
         TF_VAR_subscription_id: ${{ secrets.ARM_SUBSCRIPTION_ID }}
         TF_VAR_tenant_id: ${{ secrets.ARM_TENANT_ID }}
-        
+
     - name: 📊 Terraform Plan (Dev)
       working-directory: ./infra/envs/dev
+      run: |
+        terraform init -reconfigure
+        terraform plan -input=false -var-file=dev.tfvars
       env:
         ARM_CLIENT_ID: ${{ secrets.ARM_CLIENT_ID }}
         ARM_CLIENT_SECRET: ${{ secrets.ARM_CLIENT_SECRET }}
@@ -67,7 +50,3 @@ jobs:
         ARM_TENANT_ID: ${{ secrets.ARM_TENANT_ID }}
         TF_VAR_subscription_id: ${{ secrets.ARM_SUBSCRIPTION_ID }}
         TF_VAR_tenant_id: ${{ secrets.ARM_TENANT_ID }}
-      run: |
-        terraform init -reconfigure
-        terraform plan -input=false -var-file=dev.tfvars
-
