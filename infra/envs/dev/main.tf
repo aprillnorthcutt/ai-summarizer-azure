@@ -18,7 +18,7 @@ resource "azurerm_service_plan" "app_plan" {
   sku_name            = "B1"
   tags                = var.tags
 
- lifecycle {
+  lifecycle {
     prevent_destroy = true
   }
 }
