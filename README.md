@@ -61,7 +61,7 @@ You can deploy infrastructure either locally or via GitHub Actions:
 - 💻 **Local CLI**: Use `terraform init` and `terraform apply` with environment-specific tfvars  
 - ☁️ **GitHub Actions**: On push or PR, run workflows defined in `.github/workflows`
 
-📁 [View the full deployment guide](docs/DEPLOYMENT-GUIDE.md)
+📁 [View the full deployment guide](docs/DEPLOYMENT-guide.md)
 
 ---
 
@@ -69,8 +69,10 @@ You can deploy infrastructure either locally or via GitHub Actions:
 
 ### ✅ GitHub Actions
 - Auto-plan/apply Terraform from PRs or commits  
-- Secrets managed via GitHub repository settings  
-- [View workflow file](.github/workflows/ci.yml)
+- Secrets managed via GitHub repository settings 
+- Split into 2 files for maintaiability between Terraform and App code. 
+- [View CI .Net workflow file](.github/workflows/ci-dotnet.yml)
+- [View CI Terraform workflow file](.github/workflows/ci-terraform.yml)
 
 ### ✅ Azure DevOps (Optional)
 - [pipelines/azure-pipeline.yml](pipelines/azure-pipeline.yml) provides a sample deploy pipeline  
@@ -91,10 +93,10 @@ You can deploy infrastructure either locally or via GitHub Actions:
 
 ## 📘 Project Journey Docs
 
-- [CI/CD + GitHub Flow](docs/GIT-GITHUB-CICD-JOURNEY.md)
-- [Azure Infrastructure Setup](docs/AZURE-INFRA-SETUP.md)
-- [Deployment Guide](docs/DEPLOYMENT-GUIDE.md)
-- [Architecture Diagram](docs/Local%20to%20Azure%20Setup.png)
+- [CI/CD + GitHub Flow](docs/GIT-GITHUB-CICD-JOURNEY.png)
+- [Azure Infrastructure Setup](docs/AZURE-INFRA-SETUP.png)
+- [Deployment Guide](docs/DEPLOYMENT-guide.md)
+- [Architecture Diagram](docs/Azure%20Local%20Setup.png)
 
 ---
 
