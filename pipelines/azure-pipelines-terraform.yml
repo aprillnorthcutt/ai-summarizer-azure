@@ -34,8 +34,8 @@ variables:
   PLAN_ARTIFACT_PROD: "tfplan-prod-$(Build.BuildNumber)"
 
 pool: 
-  #vmImage: "ubuntu-latest" remove comment and delete name line when extra parrallel is granted.
-  name: Default
+  vmImage: "ubuntu-latest" 
+  #name: Default
   
 
 stages:
