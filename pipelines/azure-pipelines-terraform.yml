@@ -1,0 +1,206 @@
+# azure-pipelines-terraform.yml
+name: CI/CD - Terraform
+
+trigger:
+  branches: { include: [ main ] }
+  paths:    { include: [ infra/** ] }
+
+pr:
+  branches: { include: [ main ] }
+  paths:    { include: [ infra/** ] }
+
+variables:
+  TF_VERSION: '1.8.5'
+  SERVICE_CONNECTION: 'sc-azure-summarizer'   # Azure RM service connection (App registration automatic)
+
+  # DEV
+  TF_WORKDIR_DEV: 'infra/envs/dev'
+  TF_VAR_FILE_DEV: 'dev.tfvars'
+  PLAN_OUT_DEV: 'tfplan'
+
+  # PROD
+  TF_WORKDIR_PROD: 'infra/envs/prod'          # create this folder if you haven't yet
+  TF_VAR_FILE_PROD: 'prod.tfvars'
+  PLAN_OUT_PROD: 'tfplan'
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+stages:
+# =============== DEV ===============
+- stage: Dev_Plan
+  displayName: "Terraform Dev: Format, Validate & Plan"
+  jobs:
+  - job: plan_dev
+    steps:
+    - checkout: self
+
+    - task: TerraformInstaller@1
+      displayName: Install Terraform
+      inputs:
+        terraformVersion: '$(TF_VERSION)'
+
+    - script: |
+        find ./infra -type f -name "*.tf" ! -path "*_archive*" -exec terraform fmt -check {} +
+      displayName: "Terraform Format Check"
+
+    - task: TerraformTaskV4@4
+      displayName: "Terraform Init (Dev)"
+      inputs:
+        provider: 'azurerm'
+        command: 'init'
+        workingDirectory: '$(TF_WORKDIR_DEV)'
+        # If backend isn't fully in code, uncomment and fill these:
+        # backendServiceArm: '$(SERVICE_CONNECTION)'
+        # backendAzureRmResourceGroupName: 'rg-tfstate'
+        # backendAzureRmStorageAccountName: 'sttfstate123'
+        # backendAzureRmContainerName: 'tfstate'
+        # backendAzureRmKey: 'summarizer-dev.tfstate'
+
+    - task: TerraformTaskV4@4
+      displayName: "Terraform Validate (Dev)"
+      inputs:
+        provider: 'azurerm'
+        command: 'validate'
+        workingDirectory: '$(TF_WORKDIR_DEV)'
+
+    - task: TerraformTaskV4@4
+      displayName: "Terraform Plan (Dev)"
+      inputs:
+        provider: 'azurerm'
+        command: 'plan'
+        workingDirectory: '$(TF_WORKDIR_DEV)'
+        environmentServiceNameAzureRM: '$(SERVICE_CONNECTION)'
+        commandOptions: '-input=false -var-file=$(TF_VAR_FILE_DEV) -out=$(PLAN_OUT_DEV)'
+
+    - task: PublishPipelineArtifact@1
+      displayName: "Publish Plan Artifact (Dev)"
+      inputs:
+        targetPath: '$(TF_WORKDIR_DEV)/$(PLAN_OUT_DEV)'
+        artifact: 'tfplan-dev'
+
+- stage: Dev_Apply
+  displayName: "Terraform Dev: Apply"
+  dependsOn: Dev_Plan
+  condition: and(
+    succeeded(),
+    eq(variables['Build.SourceBranch'], 'refs/heads/main'),
+    ne(variables['Build.Reason'], 'PullRequest')
+  )
+  environment: 'dev'     # Add approvals/checks in DevOps → Environments → dev
+  jobs:
+  - job: apply_dev
+    steps:
+    - checkout: self
+
+    - task: TerraformInstaller@1
+      displayName: Install Terraform
+      inputs:
+        terraformVersion: '$(TF_VERSION)'
+
+    - task: TerraformTaskV4@4
+      displayName: "Terraform Init (Dev)"
+      inputs:
+        provider: 'azurerm'
+        command: 'init'
+        workingDirectory: '$(TF_WORKDIR_DEV)'
+
+    - download: current
+      artifact: tfplan-dev
+      displayName: "Download Plan Artifact (Dev)"
+
+    - task: TerraformTaskV4@4
+      displayName: "Terraform Apply (Dev)"
+      inputs:
+        provider: 'azurerm'
+        command: 'apply'
+        workingDirectory: '$(TF_WORKDIR_DEV)'
+        environmentServiceNameAzureRM: '$(SERVICE_CONNECTION)'
+        commandOptions: '-input=false -auto-approve $(Pipeline.Workspace)/tfplan-dev/$(PLAN_OUT_DEV)'
+
+# =============== PROD ===============
+- stage: Prod_Plan
+  displayName: "Terraform Prod: Plan"
+  dependsOn: Dev_Apply
+  condition: and(
+    succeeded(),
+    eq(variables['Build.SourceBranch'], 'refs/heads/main'),
+    ne(variables['Build.Reason'], 'PullRequest')
+  )
+  jobs:
+  - job: plan_prod
+    steps:
+    - checkout: self
+
+    - task: TerraformInstaller@1
+      displayName: Install Terraform
+      inputs:
+        terraformVersion: '$(TF_VERSION)'
+
+    - task: TerraformTaskV4@4
+      displayName: "Terraform Init (Prod)"
+      inputs:
+        provider: 'azurerm'
+        command: 'init'
+        workingDirectory: '$(TF_WORKDIR_PROD)'
+
+    - task: TerraformTaskV4@4
+      displayName: "Terraform Validate (Prod)"
+      inputs:
+        provider: 'azurerm'
+        command: 'validate'
+        workingDirectory: '$(TF_WORKDIR_PROD)'
+
+    - task: TerraformTaskV4@4
+      displayName: "Terraform Plan (Prod)"
+      inputs:
+        provider: 'azurerm'
+        command: 'plan'
+        workingDirectory: '$(TF_WORKDIR_PROD)'
+        environmentServiceNameAzureRM: '$(SERVICE_CONNECTION)'
+        commandOptions: '-input=false -var-file=$(TF_VAR_FILE_PROD) -out=$(PLAN_OUT_PROD)'
+
+    - task: PublishPipelineArtifact@1
+      displayName: "Publish Plan Artifact (Prod)"
+      inputs:
+        targetPath: '$(TF_WORKDIR_PROD)/$(PLAN_OUT_PROD)'
+        artifact: 'tfplan-prod'
+
+- stage: Prod_Apply
+  displayName: "Terraform Prod: Apply"
+  dependsOn: Prod_Plan
+  condition: and(
+    succeeded(),
+    eq(variables['Build.SourceBranch'], 'refs/heads/main'),
+    ne(variables['Build.Reason'], 'PullRequest')
+  )
+  environment: 'prod'    # Add approvals/checks in DevOps → Environments → prod
+  jobs:
+  - job: apply_prod
+    steps:
+    - checkout: self
+
+    - task: TerraformInstaller@1
+      displayName: Install Terraform
+      inputs:
+        terraformVersion: '$(TF_VERSION)'
+
+    - task: TerraformTaskV4@4
+      displayName: "Terraform Init (Prod)"
+      inputs:
+        provider: 'azurerm'
+        command: 'init'
+        workingDirectory: '$(TF_WORKDIR_PROD)'
+
+    - download: current
+      artifact: tfplan-prod
+      displayName: "Download Plan Artifact (Prod)"
+
+    - task: TerraformTaskV4@4
+      displayName: "Terraform Apply (Prod)"
+      inputs:
+        provider: 'azurerm'
+        command: 'apply'
+        workingDirectory: '$(TF_WORKDIR_PROD)'
+        environmentServiceNameAzureRM: '$(SERVICE_CONNECTION)'
+        commandOptions: '-input=false -auto-approve $(Pipeline.Workspace)/tfplan-prod/$(PLAN_OUT_PROD)'
