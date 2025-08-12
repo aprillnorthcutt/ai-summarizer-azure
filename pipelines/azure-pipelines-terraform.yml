@@ -1,3 +1,4 @@
+# pipelines/azure-pipelines-terraform.yml
 # Run name = branch + date + rev (visible in ADO UI)
 name: "$(Build.SourceBranchName)-$(Date:yyyy.MM.dd)-$(Rev:rr)"
 
@@ -16,6 +17,8 @@ pr:
 variables:
   TF_VERSION: "1.8.5"
   SERVICE_CONNECTION: "sc-azure-summarizer"
+
+  # Build/version info passed into Terraform (e.g., tags)
   BUILD_VERSION: "$(Build.SourceBranchName)-$(Build.SourceVersion)"
 
   # DEV
@@ -59,6 +62,7 @@ stages:
             provider: "azurerm"
             command: "init"
             workingDirectory: "$(TF_WORKDIR_DEV)"
+            # If backend isn't fully in code, uncomment and fill these:
             # backendServiceArm: "$(SERVICE_CONNECTION)"
             # backendAzureRmResourceGroupName: "rg-tfstate"
             # backendAzureRmStorageAccountName: "sttfstate123"
@@ -84,6 +88,10 @@ stages:
               -var-file=$(TF_VAR_FILE_DEV)
               -var "build_version=$(BUILD_VERSION)"
               -out=$(PLAN_OUT_DEV)
+          # If your variable group does NOT prefix names with TF_VAR_, map them, e.g.:
+          # env:
+          #   TF_VAR_cognitive_endpoint: $(cognitive_endpoint)
+          #   TF_VAR_cognitive_key: $(cognitive_key)
 
         - task: PublishPipelineArtifact@1
           displayName: "Publish Plan Artifact (Dev)"
@@ -97,36 +105,40 @@ stages:
     - group: tf-azure-dev
   dependsOn: Dev_Plan
   condition: "and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'), ne(variables['Build.Reason'], 'PullRequest'))"
-  environment: "dev"
   jobs:
-    - job: apply_dev
-      steps:
-        - checkout: self
+    - deployment: apply_dev
+      displayName: "Apply Dev"
+      environment: "dev"   # approvals/checks attach here
+      strategy:
+        runOnce:
+          deploy:
+            steps:
+              - checkout: self
 
-        - task: TerraformInstaller@1
-          displayName: Install Terraform
-          inputs:
-            terraformVersion: "$(TF_VERSION)"
+              - task: TerraformInstaller@1
+                displayName: Install Terraform
+                inputs:
+                  terraformVersion: "$(TF_VERSION)"
 
-        - task: TerraformTaskV4@4
-          displayName: "Terraform Init (Dev)"
-          inputs:
-            provider: "azurerm"
-            command: "init"
-            workingDirectory: "$(TF_WORKDIR_DEV)"
+              - task: TerraformTaskV4@4
+                displayName: "Terraform Init (Dev)"
+                inputs:
+                  provider: "azurerm"
+                  command: "init"
+                  workingDirectory: "$(TF_WORKDIR_DEV)"
 
-        - download: current
-          artifact: "$(PLAN_ARTIFACT_DEV)"
-          displayName: "Download Plan Artifact (Dev)"
+              - download: current
+                artifact: "$(PLAN_ARTIFACT_DEV)"
+                displayName: "Download Plan Artifact (Dev)"
 
-        - task: TerraformTaskV4@4
-          displayName: "Terraform Apply (Dev)"
-          inputs:
-            provider: "azurerm"
-            command: "apply"
-            workingDirectory: "$(TF_WORKDIR_DEV)"
-            environmentServiceNameAzureRM: "$(SERVICE_CONNECTION)"
-            commandOptions: "-input=false -auto-approve $(Pipeline.Workspace)/$(PLAN_ARTIFACT_DEV)/$(PLAN_OUT_DEV)"
+              - task: TerraformTaskV4@4
+                displayName: "Terraform Apply (Dev)"
+                inputs:
+                  provider: "azurerm"
+                  command: "apply"
+                  workingDirectory: "$(TF_WORKDIR_DEV)"
+                  environmentServiceNameAzureRM: "$(SERVICE_CONNECTION)"
+                  commandOptions: "-input=false -auto-approve $(Pipeline.Workspace)/$(PLAN_ARTIFACT_DEV)/$(PLAN_OUT_DEV)"
 
 # =============== PROD ===============
 - stage: Prod_Plan
@@ -151,6 +163,12 @@ stages:
             provider: "azurerm"
             command: "init"
             workingDirectory: "$(TF_WORKDIR_PROD)"
+            # If backend isn't fully in code, uncomment and fill these:
+            # backendServiceArm: "$(SERVICE_CONNECTION)"
+            # backendAzureRmResourceGroupName: "rg-tfstate"
+            # backendAzureRmStorageAccountName: "sttfstate123"
+            # backendAzureRmContainerName: "tfstate"
+            # backendAzureRmKey: "summarizer/prod.tfstate"
 
         - task: TerraformTaskV4@4
           displayName: "Terraform Validate (Prod)"
@@ -170,7 +188,7 @@ stages:
               -input=false
               -var-file=$(TF_VAR_FILE_PROD)
               -var "build_version=$(BUILD_VERSION)"
-              -out=$(PLAN_OUT_PROD)"
+              -out=$(PLAN_OUT_PROD)
 
         - task: PublishPipelineArtifact@1
           displayName: "Publish Plan Artifact (Prod)"
@@ -184,33 +202,37 @@ stages:
     - group: tf-azure-prod
   dependsOn: Prod_Plan
   condition: "and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'), ne(variables['Build.Reason'], 'PullRequest'))"
-  environment: "prod"
   jobs:
-    - job: apply_prod
-      steps:
-        - checkout: self
+    - deployment: apply_prod
+      displayName: "Apply Prod"
+      environment: "prod"  # approvals/checks attach here
+      strategy:
+        runOnce:
+          deploy:
+            steps:
+              - checkout: self
 
-        - task: TerraformInstaller@1
-          displayName: Install Terraform
-          inputs:
-            terraformVersion: "$(TF_VERSION)"
+              - task: TerraformInstaller@1
+                displayName: Install Terraform
+                inputs:
+                  terraformVersion: "$(TF_VERSION)"
 
-        - task: TerraformTaskV4@4
-          displayName: "Terraform Init (Prod)"
-          inputs:
-            provider: "azurerm"
-            command: "init"
-            workingDirectory: "$(TF_WORKDIR_PROD)"
+              - task: TerraformTaskV4@4
+                displayName: "Terraform Init (Prod)"
+                inputs:
+                  provider: "azurerm"
+                  command: "init"
+                  workingDirectory: "$(TF_WORKDIR_PROD)"
 
-        - download: current
-          artifact: "$(PLAN_ARTIFACT_PROD)"
-          displayName: "Download Plan Artifact (Prod)"
+              - download: current
+                artifact: "$(PLAN_ARTIFACT_PROD)"
+                displayName: "Download Plan Artifact (Prod)"
 
-        - task: TerraformTaskV4@4
-          displayName: "Terraform Apply (Prod)"
-          inputs:
-            provider: "azurerm"
-            command: "apply"
-            workingDirectory: "$(TF_WORKDIR_PROD)"
-            environmentServiceNameAzureRM: "$(SERVICE_CONNECTION)"
-            commandOptions: "-input=false -auto-approve $(Pipeline.Workspace)/$(PLAN_ARTIFACT_PROD)/$(PLAN_OUT_PROD)"
+              - task: TerraformTaskV4@4
+                displayName: "Terraform Apply (Prod)"
+                inputs:
+                  provider: "azurerm"
+                  command: "apply"
+                  workingDirectory: "$(TF_WORKDIR_PROD)"
+                  environmentServiceNameAzureRM: "$(SERVICE_CONNECTION)"
+                  commandOptions: "-input=false -auto-approve $(Pipeline.Workspace)/$(PLAN_ARTIFACT_PROD)/$(PLAN_OUT_PROD)"
