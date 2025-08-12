@@ -26,6 +26,7 @@ crash.log
 *.log
 *.DS_Store
 *.vscode/
+*.vs/
 
 # ────────────────
 # Secrets / Credentials (ensure you use ENV or Key Vault instead!)
