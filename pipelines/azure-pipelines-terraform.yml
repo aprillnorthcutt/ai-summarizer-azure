@@ -35,7 +35,7 @@ variables:
 
 pool: 
   #vmImage: "ubuntu-latest" remove comment and delete name line when extra parrallel is granted.
-  name: Defeault
+  name: Default
   
 
 stages:
