@@ -33,8 +33,10 @@ variables:
   PLAN_OUT_PROD: "tfplan"
   PLAN_ARTIFACT_PROD: "tfplan-prod-$(Build.BuildNumber)"
 
-pool:
-  vmImage: "ubuntu-latest"
+pool: 
+  #vmImage: "ubuntu-latest" remove comment and delete name line when extra parrallel is granted.
+  name: Defeault
+  
 
 stages:
 # =============== DEV ===============
