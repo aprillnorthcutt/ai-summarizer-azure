@@ -72,9 +72,12 @@ jobs:
       - name: 🔐 Azure login (OIDC)
         uses: azure/login@v2
         with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      ARM_CLIENT_ID: ${{ secrets.ARM_CLIENT_ID }}
+      ARM_CLIENT_SECRET: ${{ secrets.ARM_CLIENT_SECRET }}
+      ARM_SUBSCRIPTION_ID: ${{ secrets.ARM_SUBSCRIPTION_ID }}
+      ARM_TENANT_ID: ${{ secrets.ARM_TENANT_ID }}
+      TF_VAR_subscription_id: ${{ secrets.ARM_SUBSCRIPTION_ID }}
+      TF_VAR_tenant_id: ${{ secrets.ARM_TENANT_ID }}
 
       - name: 🚀 Deploy to App Service (dev)
         uses: azure/webapps-deploy@v3
@@ -82,48 +85,4 @@ jobs:
           app-name: your-appservice-dev
           package: ./publish
 
-  deploy-test:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: deploy-dev
-    runs-on: ubuntu-latest
-    environment: test
-    concurrency:
-      group: appservice-test
-      cancel-in-progress: false
-    steps:
-      - uses: actions/download-artifact@v4
-        with:
-          name: webapi-drop-${{ github.run_id }}
-          path: ./publish
-      - uses: azure/login@v2
-        with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-      - uses: azure/webapps-deploy@v3
-        with:
-          app-name: your-appservice-test
-          package: ./publish
-
-  deploy-prod:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: deploy-test
-    runs-on: ubuntu-latest
-    environment: prod  # protect this env with required reviewers
-    concurrency:
-      group: appservice-prod
-      cancel-in-progress: false
-    steps:
-      - uses: actions/download-artifact@v4
-        with:
-          name: webapi-drop-${{ github.run_id }}
-          path: ./publish
-      - uses: azure/login@v2
-        with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-      - uses: azure/webapps-deploy@v3
-        with:
-          app-name: your-appservice-prod
-          package: ./publish
+  
