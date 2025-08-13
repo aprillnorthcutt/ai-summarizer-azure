@@ -24,5 +24,9 @@
       "applicationUrl": "http://localhost:52173/",
       "sslPort": 44320
     }
+  },
+  //comment this out when going to azure
+  "environmentVariables": {
+    "ASPNETCORE_ENVIRONMENT": "Development"
   }
 }

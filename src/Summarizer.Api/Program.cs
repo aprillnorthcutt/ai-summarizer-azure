@@ -3,7 +3,9 @@ using Azure;
 using Azure.AI.DocumentIntelligence;
 using Azure.AI.TextAnalytics;
 using Azure.Core;
+using DotNetEnv;
 using Microsoft.AspNetCore.Mvc;
+using System;
 using System.Text;
 using System.Text.Json;
 
@@ -124,16 +126,59 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddControllers();
 
+string langEndpoint;
+string langKey;
+string diEndpoint;
+string diKey;
+// Load .env only in Development
+var environment = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT");
+
+
+if (environment == "Development")
+{
+    var env = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT");
+
+    // Only load env file in Development
+    if (Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") == "Development")
+    {
+        // Get project root (where Summarizer.Api.csproj lives)
+        string projectRoot = Directory.GetParent(AppContext.BaseDirectory)?.Parent?.Parent?.Parent?.FullName
+                             ?? throw new InvalidOperationException("Unable to locate project root");
+
+        // Build full path to localvar.env
+        string envPath = Path.Combine(projectRoot, "localvar.env");
+
+        // Load the file
+        Env.Load(envPath);
+        Console.WriteLine($"Loaded environment variables from: {envPath}");
+        Console.WriteLine(Environment.GetEnvironmentVariable("AI_LANGUAGE_ENDPOINT"));
+    }
+
+
+    //logging
+    Console.WriteLine($"Environment: {environment}");
+    langEndpoint = Environment.GetEnvironmentVariable("AI_LANGUAGE_ENDPOINT");
+    langKey = Environment.GetEnvironmentVariable("AI_LANGUAGE_KEY");
+    diEndpoint = Environment.GetEnvironmentVariable("AI_DOCINTEL_ENDPOINT");
+    diKey = Environment.GetEnvironmentVariable("AI_DOCINTEL_KEY");
+
+}
+else { 
+
 // Azure AI clients from environment variables
-string langEndpoint = Environment.GetEnvironmentVariable("AI_LANGUAGE_ENDPOINT")
+ langEndpoint = Environment.GetEnvironmentVariable("AI_LANGUAGE_ENDPOINT")
     ?? throw new InvalidOperationException("AI_LANGUAGE_ENDPOINT not set");
-string langKey = Environment.GetEnvironmentVariable("AI_LANGUAGE_KEY")
+ langKey = Environment.GetEnvironmentVariable("AI_LANGUAGE_KEY")
     ?? throw new InvalidOperationException("AI_LANGUAGE_KEY not set");
 
-string diEndpoint = Environment.GetEnvironmentVariable("AI_DOCINTEL_ENDPOINT")
+ diEndpoint = Environment.GetEnvironmentVariable("AI_DOCINTEL_ENDPOINT")
     ?? throw new InvalidOperationException("AI_DOCINTEL_ENDPOINT not set");
-string diKey = Environment.GetEnvironmentVariable("AI_DOCINTEL_KEY")
+ diKey = Environment.GetEnvironmentVariable("AI_DOCINTEL_KEY")
     ?? throw new InvalidOperationException("AI_DOCINTEL_KEY not set");
+}
+
+
+
 
 builder.Services.AddSingleton(new TextAnalyticsClient(new Uri(langEndpoint), new AzureKeyCredential(langKey)));
 builder.Services.AddSingleton(new DocumentIntelligenceClient(new Uri(diEndpoint), new AzureKeyCredential(diKey)));
