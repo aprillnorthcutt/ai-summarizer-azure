@@ -82,5 +82,5 @@ jobs:
       - name: 🚀 Deploy to App Service (dev)
         uses: azure/webapps-deploy@v3
         with:
-          app-name: your-appservice-dev
+          app-name: summarizer-api-dev
           package: ./publish
