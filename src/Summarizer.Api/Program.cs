@@ -9,8 +9,6 @@ using System.Text.Json;
 using Summarizer.Api.Models;
 using Swashbuckle.AspNetCore.Annotations;
 
-
-
 // ---------- Helpers ----------
 static string? TryExtractTextFromBinaryData(BinaryData bd, int maxChars = 16000)
 {
@@ -210,7 +208,6 @@ static async Task<object> AnalyzeTextAsync(string text, TextAnalyticsClient taCl
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddEndpointsApiExplorer();
-//builder.Services.AddSwaggerGen();
 builder.Services.AddSwaggerGen(c =>
 {
     c.EnableAnnotations();
@@ -271,41 +268,19 @@ builder.Services.AddSingleton(new DocumentIntelligenceClient(new Uri(diEndpoint)
 
 var app = builder.Build();
 
-if (app.Environment.IsDevelopment())
-{
-    app.UseSwagger();
-    app.UseSwaggerUI();
-}
-
 app.UseHttpsRedirection();
+
+// ? Enable Swagger in all environments (so Azure shows it)
+app.UseSwagger();
+app.UseSwaggerUI();
+
+// ? Root + health endpoints
+app.MapGet("/", () => Results.Redirect("/swagger"));
+app.MapGet("/healthz", () => Results.Ok("OK"));
+
+// MVC / attribute-routed controllers
 app.MapControllers();
 
-// Redirect root to Swagger so F5 opens UI
-//app.MapGet("/", () => Results.Redirect("/swagger"));
-
-// ---------- GET /whoami ----------
-//app.MapGet("/whoami", (HttpContext ctx) =>
-//{
-//    // No secrets logged
-//    var info = new
-//    {
-//        environment = app.Environment.EnvironmentName,
-//        machine = Environment.MachineName,
-//        user = Environment.UserName,
-//        processId = Environment.ProcessId,
-//        framework = System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription,
-//        aiLanguageEndpointHost = new Uri(langEndpoint).Host,
-//        aiDocIntelEndpointHost = new Uri(diEndpoint).Host,
-//        hasLanguageKey = !string.IsNullOrWhiteSpace(langKey),
-//        hasDocIntelKey = !string.IsNullOrWhiteSpace(diKey),
-//        clientIp = ctx.Connection.RemoteIpAddress?.ToString()
-//    };
-//    return Results.Ok(info);
-//})
-//.WithName("WhoAmI")
-//.Produces(StatusCodes.Status200OK);
-
-// ---------- POST /summarize/document (file upload) ----------
 // ---------- POST /summarize/document (file upload) ----------
 app.MapPost("/summarize/document",
     async (IFormFile document,                 // <-- no [FromForm] on IFormFile
@@ -421,21 +396,5 @@ app.MapPost("/summarize/text",
     .Produces(StatusCodes.Status200OK)
     .ProducesProblem(StatusCodes.Status400BadRequest)
     .DisableAntiforgery();
-
-// POST /summarize/json  (RAW JSON body)
-//app.MapPost("/summarize/json",
-//        async ([FromBody] SummarizeJsonRequest body,
-//            TextAnalyticsClient taClient) =>
-//        {
-//            if (string.IsNullOrWhiteSpace(body.Text))
-//                return Results.BadRequest(new { error = "'text' must be a non-empty string." });
-
-//            var analysis = await AnalyzeTextAsync(body.Text, taClient);
-//            return Results.Ok(analysis);
-//        })
-//    .WithMetadata(new ConsumesAttribute("application/json"))
-//    .Produces(StatusCodes.Status200OK)
-//    .ProducesProblem(StatusCodes.Status400BadRequest)
-//    .DisableAntiforgery();
 
 app.Run();
