@@ -1,47 +1,14 @@
-//{
-//  "profiles": {
-//    "Summarizer.Api": {
-//      "commandName": "Project",
-//      "launchBrowser": true,
-//      "environmentVariables": {
-//        "ASPNETCORE_ENVIRONMENT": "Development"
-//      },
-//      "dotnetRunMessages": true,
-//      "applicationUrl": "https://localhost:7001;http://localhost:5001"
-//    },
-//    "IIS Express": {
-//      "commandName": "IISExpress",
-//      "launchBrowser": true,
-//      "environmentVariables": {
-//        "ASPNETCORE_ENVIRONMENT": "Development"
-//      }
-//    }
-//  },
-//  "iisSettings": {
-//    "windowsAuthentication": false,
-//    "anonymousAuthentication": true,
-//    "iisExpress": {
-//      "applicationUrl": "http://localhost:52173/",
-//      "sslPort": 44320
-//    }
-//  },
-//  //comment this out when going to azure
-//  "environmentVariables": {
-//    "ASPNETCORE_ENVIRONMENT": "Development"
-//  }
-//}
-
 {
   "profiles": {
     "Summarizer.Api": {
       "commandName": "Project",
-      "dotnetRunMessages": true,
       "launchBrowser": true,
       "launchUrl": "swagger",
-      "applicationUrl": "https://localhost:7001;http://localhost:7000",
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development"
-      }
+      },
+      "dotnetRunMessages": true,
+      "applicationUrl": "https://localhost:7001;http://localhost:7000"
     },
     "IIS Express": {
       "commandName": "IISExpress",
@@ -50,6 +17,14 @@
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development"
       }
+    }
+  },
+  "iisSettings": {
+    "windowsAuthentication": false,
+    "anonymousAuthentication": true,
+    "iisExpress": {
+      "applicationUrl": "http://localhost:61367/",
+      "sslPort": 44395
     }
   }
 }
