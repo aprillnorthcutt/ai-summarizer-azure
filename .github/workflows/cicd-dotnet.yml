@@ -1,4 +1,4 @@
-name: CI – Build & Test .NET App (with CD via SP)
+name: CI – Build & Test .NET App (CD via SP, no slot)
 
 on:
   push:
@@ -15,6 +15,8 @@ permissions:
 env:
   DOTNET_VERSION: 8.0.x
   API_PROJECT: src/Summarizer.Api/Summarizer.Api.csproj
+  AZURE_RG: rg-summarizer-dev
+  AZURE_APP: summarizer-api-dev
 
 jobs:
   dotnet-build-and-test:
@@ -31,15 +33,15 @@ jobs:
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
 
-      - name: 🛠 Restore and build .NET
+      - name: 🛠 Restore & Build
         run: |
           dotnet restore ./src/AiSummarizer.sln
-          dotnet build ./src/AiSummarizer.sln --no-restore --configuration Release
+          dotnet build ./src/AiSummarizer.sln --no-restore -c Release
 
-      - name: ✅ Run Tests (unit tests under src)
-        run: dotnet test ./src/Summarizer.Tests/Summarizer.Tests.csproj --configuration Release --no-build
+      - name: ✅ Unit Tests
+        run: dotnet test ./src/Summarizer.Tests/Summarizer.Tests.csproj -c Release --no-build
 
-      - name: 📊 Collect Code Coverage
+      - name: 📊 Code Coverage
         run: dotnet test ./src/Summarizer.Tests/Summarizer.Tests.csproj --collect:"XPlat Code Coverage"
 
       - name: 📦 Publish API
@@ -77,8 +79,27 @@ jobs:
               "subscriptionId": "${{ secrets.ARM_SUBSCRIPTION_ID }}"
             }
 
-      - name: 🚀 Deploy to App Service (dev)
+      - name: 📦 Zip package for ZipDeploy
+        run: |
+          cd ./publish
+          zip -r ../package.zip .
+          cd -
+
+      - name: 🚀 Deploy to App Service (prod site)
         uses: azure/webapps-deploy@v3
         with:
-          app-name: summarizer-api-dev
-          package: ./publish
+          app-name: ${{ env.AZURE_APP }}
+          package: package.zip
+
+      - name: 🔧 Show critical app settings (debug)
+        uses: azure/cli@v2
+        with:
+          inlineScript: |
+            az webapp config appsettings list -g $AZURE_RG -n $AZURE_APP \
+              --query "[?name=='WEBSITE_RUN_FROM_PACKAGE' || name=='SCM_DO_BUILD_DURING_DEPLOYMENT']"
+
+      - name: 🔄 Restart App Service
+        uses: azure/cli@v2
+        with:
+          inlineScript: |
+            az webapp restart -g $AZURE_RG -n $AZURE_APP
