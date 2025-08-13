@@ -1,4 +1,4 @@
-// File: src/Summarizer.Api/Program.cs
+﻿// File: src/Summarizer.Api/Program.cs
 using Azure;
 using Azure.AI.DocumentIntelligence;
 using Azure.AI.TextAnalytics;
@@ -9,112 +9,59 @@ using System.Text;
 using System.Text.Json;
 using System.Linq;
 using System.Diagnostics;
+using System.Collections.Generic;
 
 // ---------- Helpers ----------
-static string? TryExtractTextFromBinaryData(BinaryData bd, int maxChars = 16000)
+static string? TryExtractTextFromAnalyzeResult(AnalyzeResult ar, int maxChars = 16000)
 {
-    try
+    // Prefer the built-in flattened content first
+    if (!string.IsNullOrWhiteSpace(ar.Content))
     {
-        var json = bd.ToString();
-        using var doc = JsonDocument.Parse(json);
+        return ar.Content.Length > maxChars ? ar.Content[..maxChars] : ar.Content;
+    }
 
-        static string? pullFromElement(JsonElement el, int max)
+    // Fall back to paragraphs
+    if (ar.Paragraphs is not null && ar.Paragraphs.Count > 0)
+    {
+        var sb = new StringBuilder();
+        foreach (var p in ar.Paragraphs)
         {
-            // content
-            if (el.TryGetProperty("content", out var c))
+            if (!string.IsNullOrWhiteSpace(p.Content))
             {
-                var s = c.GetString();
-                if (!string.IsNullOrWhiteSpace(s))
-                    return s.Length > max ? s[..max] : s;
-            }
-            // paragraphs[].content
-            if (el.TryGetProperty("paragraphs", out var paras) &&
-                paras.ValueKind == JsonValueKind.Array)
-            {
-                var sb = new StringBuilder();
-                foreach (var p in paras.EnumerateArray())
+                if (sb.Length + p.Content.Length > maxChars)
                 {
-                    if (p.TryGetProperty("content", out var pc))
-                    {
-                        var t = pc.GetString();
-                        if (!string.IsNullOrWhiteSpace(t))
-                        {
-                            sb.AppendLine(t);
-                            if (sb.Length > max) break;
-                        }
-                    }
+                    sb.Append(p.Content.AsSpan(0, maxChars - sb.Length));
+                    break;
                 }
-                if (sb.Length > 0) return sb.ToString();
-            }
-            // pages[].content and/or pages[].lines[].content
-            if (el.TryGetProperty("pages", out var pages) &&
-                pages.ValueKind == JsonValueKind.Array)
-            {
-                var sb = new StringBuilder();
-                foreach (var p in pages.EnumerateArray())
-                {
-                    if (p.TryGetProperty("content", out var pc))
-                    {
-                        var t = pc.GetString();
-                        if (!string.IsNullOrWhiteSpace(t))
-                        {
-                            sb.AppendLine(t);
-                            if (sb.Length > max) break;
-                        }
-                    }
-                    if (p.TryGetProperty("lines", out var lines) &&
-                        lines.ValueKind == JsonValueKind.Array)
-                    {
-                        foreach (var ln in lines.EnumerateArray())
-                        {
-                            if (ln.TryGetProperty("content", out var lc))
-                            {
-                                var t = lc.GetString();
-                                if (!string.IsNullOrWhiteSpace(t))
-                                {
-                                    sb.AppendLine(t);
-                                    if (sb.Length > max) break;
-                                }
-                            }
-                        }
-                    }
-                    if (sb.Length > max) break;
-                }
-                if (sb.Length > 0) return sb.ToString();
-            }
-            return null;
-        }
-
-        var root = doc.RootElement;
-
-        var s = pullFromElement(root, maxChars);
-        if (!string.IsNullOrWhiteSpace(s)) return s;
-
-        foreach (var key in new[] { "result", "analyzeResult" })
-        {
-            if (root.TryGetProperty(key, out var inner))
-            {
-                s = pullFromElement(inner, maxChars);
-                if (!string.IsNullOrWhiteSpace(s)) return s;
+                sb.AppendLine(p.Content);
             }
         }
-
-        return null;
+        if (sb.Length > 0) return sb.ToString();
     }
-    catch
+
+    // Fall back to page lines
+    if (ar.Pages is not null && ar.Pages.Count > 0)
     {
-        return null;
+        var sb = new StringBuilder();
+        foreach (var page in ar.Pages)
+        {
+            if (page.Lines is null) continue;
+            foreach (var line in page.Lines)
+            {
+                if (!string.IsNullOrWhiteSpace(line.Content))
+                {
+                    if (sb.Length + line.Content.Length > maxChars)
+                    {
+                        sb.Append(line.Content.AsSpan(0, maxChars - sb.Length));
+                        goto Done;
+                    }
+                    sb.AppendLine(line.Content);
+                }
+            }
+        }
+    Done:
+        if (sb.Length > 0) return sb.ToString();
     }
-}
-
-static string? TryExtractText(object? resultObj, int maxChars = 16000)
-{
-    if (resultObj is null) return null;
-
-    var contentProp = resultObj.GetType().GetProperty("Content");
-    var contentVal = contentProp?.GetValue(resultObj)?.ToString();
-    if (!string.IsNullOrWhiteSpace(contentVal))
-        return contentVal.Length > maxChars ? contentVal[..maxChars] : contentVal;
 
     return null;
 }
@@ -129,6 +76,7 @@ static async Task<object> AnalyzeTextAsync(string text, TextAnalyticsClient taCl
     string? summary = null;
     string? taError = null;
 
+    // Language + Key Phrases
     try
     {
         var lang = await taClient.DetectLanguageAsync(sample);
@@ -148,6 +96,7 @@ static async Task<object> AnalyzeTextAsync(string text, TextAnalyticsClient taCl
         taError = $"Language/KeyPhrases failed: {ex.Message}";
     }
 
+    // Extractive summarization (with simple fallback)
     try
     {
         var docs = new List<string> { sample };
@@ -194,7 +143,7 @@ static async Task<object> AnalyzeTextAsync(string text, TextAnalyticsClient taCl
         detectedLanguageIso,
         summary,
         keywords,
-        textPreview = sample.Length > 600 ? sample[..600] + "�" : sample,
+        textPreview = sample.Length > 600 ? sample[..600] + "…" : sample,
         textAnalyticsError = taError
     };
 }
@@ -216,16 +165,23 @@ var environment = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT");
 
 if (environment == "Development")
 {
+    // Only load env file in Development
     if (Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") == "Development")
     {
+        // Get project root (where Summarizer.Api.csproj lives)
         string projectRoot = Directory.GetParent(AppContext.BaseDirectory)?.Parent?.Parent?.Parent?.FullName
                              ?? throw new InvalidOperationException("Unable to locate project root");
+
+        // Build full path to localvar.env
         string envPath = Path.Combine(projectRoot, "localvar.env");
+
+        // Load the file
         Env.Load(envPath);
         Console.WriteLine($"Loaded environment variables from: {envPath}");
         Console.WriteLine(Environment.GetEnvironmentVariable("AI_LANGUAGE_ENDPOINT"));
     }
 
+    // logging
     Console.WriteLine($"Environment: {environment}");
     langEndpoint = Environment.GetEnvironmentVariable("AI_LANGUAGE_ENDPOINT")!;
     langKey = Environment.GetEnvironmentVariable("AI_LANGUAGE_KEY")!;
@@ -253,11 +209,11 @@ var app = builder.Build();
 
 app.UseHttpsRedirection();
 
-// ? Swagger always on (easier verification in Azure)
+// ✅ Swagger always on (easier verification in Azure)
 app.UseSwagger();
 app.UseSwaggerUI();
 
-// ? Root + health endpoints
+// ✅ Root + health endpoints
 app.MapGet("/", () => Results.Redirect("/swagger"));
 app.MapGet("/healthz", () => Results.Ok("OK"));
 
@@ -294,53 +250,28 @@ app.MapPost("/summarize/document",
 
         try
         {
-            // Limit pages via options; pass body as JSON (stable across SDK versions)
-            var options = new AnalyzeDocumentOptions();
-            options.Pages.Add(pages);
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(timeoutSeconds));
 
+            // Build request body with page filter (string like "1-5" or "1,3,5")
+            var requestBody = new
+            {
+                base64Source = Convert.ToBase64String(bytes),
+                contentType = string.IsNullOrWhiteSpace(document.ContentType)
+                                ? "application/pdf"
+                                : document.ContentType,
+                pages = pages
+            };
+
+            // NOTE: Your SDK returns AnalyzeResult (strongly-typed), not BinaryData
             var diOp = await diClient.AnalyzeDocumentAsync(
-                waitUntil: WaitUntil.Completed,
-                modelId: "prebuilt-read",
-                content: BinaryData.FromObjectAsJson(new
-                {
-                    base64Source = Convert.ToBase64String(bytes),
-                    contentType = string.IsNullOrWhiteSpace(document.ContentType)
-                                    ? "application/pdf"
-                                    : document.ContentType
-                }),
-                options: options,
-                cancellationToken: new CancellationTokenSource(TimeSpan.FromSeconds(timeoutSeconds)).Token
+                WaitUntil.Completed,
+                "prebuilt-read",
+                BinaryData.FromObjectAsJson(requestBody),
+                cts.Token
             );
 
-            var resultObj = diOp.Value;
-
-            if (resultObj is BinaryData bdValue)
-            {
-                extractedText = TryExtractTextFromBinaryData(bdValue, 16000);
-                if (string.IsNullOrWhiteSpace(extractedText))
-                {
-                    try
-                    {
-                        using var j = JsonDocument.Parse(bdValue.ToString());
-                        var keys = new List<string>();
-                        foreach (var p in j.RootElement.EnumerateObject()) keys.Add(p.Name);
-                        foreach (var c in new[] { "result", "analyzeResult" })
-                        {
-                            if (j.RootElement.TryGetProperty(c, out var inner) &&
-                                inner.ValueKind == JsonValueKind.Object)
-                            {
-                                keys.Add(c + ":{ " + string.Join(",", inner.EnumerateObject().Select(o => o.Name)) + " }");
-                            }
-                        }
-                        diDiagnostic = "BinaryData JSON keys: [" + string.Join(", ", keys) + "]";
-                    }
-                    catch { }
-                }
-            }
-            else
-            {
-                extractedText = TryExtractText(resultObj, 16000);
-            }
+            var analyze = diOp.Value; // AnalyzeResult
+            extractedText = TryExtractTextFromAnalyzeResult(analyze, 16000);
         }
         catch (TaskCanceledException)
         {
