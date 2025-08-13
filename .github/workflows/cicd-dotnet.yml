@@ -2,12 +2,12 @@ name: CI – Build & Test .NET App (with CD)
 
 on:
   push:
-    branches: [main]
-    paths: ["src/**"]
+    branches: [ main ]
+    paths: [ 'src/**', '.github/workflows/**' ]
   pull_request:
-    branches: [main]
-    paths: ["src/**"]
-  workflow_dispatch:
+    branches: [ main ]
+    paths: [ 'src/**', '.github/workflows/**' ]
+  workflow_dispatch: {}
 
 permissions:
   id-token: write
@@ -20,8 +20,6 @@ env:
 jobs:
   dotnet-build-and-test:
     runs-on: ubuntu-latest
-    outputs:
-      artifact-name: ${{ steps.pkg.outputs.name }}
     steps:
       - name: 📥 Checkout code
         uses: actions/checkout@v4
@@ -39,8 +37,8 @@ jobs:
           dotnet restore ./src/AiSummarizer.sln
           dotnet build ./src/AiSummarizer.sln --no-restore --configuration Release
 
-      - name: ✅ Run Tests
-        run: dotnet test ./src/Summarizer.Tests/Summarizer.Tests.csproj
+      - name: ✅ Run Tests (unit tests under src)
+        run: dotnet test ./src/Summarizer.Tests/Summarizer.Tests.csproj --configuration Release --no-build
 
       - name: 📊 Collect Code Coverage
         run: dotnet test ./src/Summarizer.Tests/Summarizer.Tests.csproj --collect:"XPlat Code Coverage"
@@ -49,15 +47,14 @@ jobs:
         run: dotnet publish ${{ env.API_PROJECT }} -c Release -o ./publish
 
       - name: ⬆️ Upload artifact
-        id: pkg
         uses: actions/upload-artifact@v4
         with:
-          name: webapi-drop-${{ github.run_id }}
+          name: webapi-drop
           path: ./publish
 
   deploy-dev:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: dotnet-build-and-test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment: dev
     concurrency:
@@ -66,18 +63,15 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
-          name: webapi-drop-${{ github.run_id }}
+          name: webapi-drop
           path: ./publish
 
       - name: 🔐 Azure login (OIDC)
         uses: azure/login@v2
         with:
-          ARM_CLIENT_ID: ${{ secrets.ARM_CLIENT_ID }}
-          ARM_CLIENT_SECRET: ${{ secrets.ARM_CLIENT_SECRET }}
-          ARM_SUBSCRIPTION_ID: ${{ secrets.ARM_SUBSCRIPTION_ID }}
-          ARM_TENANT_ID: ${{ secrets.ARM_TENANT_ID }}
-          TF_VAR_subscription_id: ${{ secrets.ARM_SUBSCRIPTION_ID }}
-          TF_VAR_tenant_id: ${{ secrets.ARM_TENANT_ID }}
+          client-id: ${{ secrets.ARM_CLIENT_ID }}
+          tenant-id: ${{ secrets.ARM_TENANT_ID }}
+          subscription-id: ${{ secrets.ARM_SUBSCRIPTION_ID }}
 
       - name: 🚀 Deploy to App Service (dev)
         uses: azure/webapps-deploy@v3
