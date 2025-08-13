@@ -1,4 +1,4 @@
-name: CI – Build & Test .NET App (with CD)
+name: CI – Build & Test .NET App (with CD via SP)
 
 on:
   push:
@@ -10,7 +10,6 @@ on:
   workflow_dispatch: {}
 
 permissions:
-  id-token: write
   contents: read
 
 env:
@@ -61,17 +60,22 @@ jobs:
       group: appservice-dev
       cancel-in-progress: false
     steps:
-      - uses: actions/download-artifact@v4
+      - name: 📥 Download artifact
+        uses: actions/download-artifact@v4
         with:
           name: webapi-drop
           path: ./publish
 
-      - name: 🔐 Azure login (OIDC)
+      - name: 🔐 Azure login (service principal)
         uses: azure/login@v2
         with:
-          client-id: ${{ secrets.ARM_CLIENT_ID }}
-          tenant-id: ${{ secrets.ARM_TENANT_ID }}
-          subscription-id: ${{ secrets.ARM_SUBSCRIPTION_ID }}
+          creds: >
+            {
+              "clientId": "${{ secrets.ARM_CLIENT_ID }}",
+              "clientSecret": "${{ secrets.ARM_CLIENT_SECRET }}",
+              "tenantId": "${{ secrets.ARM_TENANT_ID }}",
+              "subscriptionId": "${{ secrets.ARM_SUBSCRIPTION_ID }}"
+            }
 
       - name: 🚀 Deploy to App Service (dev)
         uses: azure/webapps-deploy@v3
