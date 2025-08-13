@@ -4,10 +4,10 @@ using Azure.AI.DocumentIntelligence;
 using Azure.AI.TextAnalytics;
 using DotNetEnv;
 using Microsoft.AspNetCore.Mvc;
+using Swashbuckle.AspNetCore.Annotations;
 using System.Text;
 using System.Text.Json;
-using Summarizer.Api.Models;
-using Swashbuckle.AspNetCore.Annotations;
+using System.Linq;
 
 // ---------- Helpers ----------
 static string? TryExtractTextFromBinaryData(BinaryData bd, int maxChars = 16000)
@@ -84,12 +84,11 @@ static string? TryExtractTextFromBinaryData(BinaryData bd, int maxChars = 16000)
             return null;
         }
 
-        // Try root
         var root = doc.RootElement;
+
         var s = pullFromElement(root, maxChars);
         if (!string.IsNullOrWhiteSpace(s)) return s;
 
-        // Try nested result/analyzeResult
         foreach (var key in new[] { "result", "analyzeResult" })
         {
             if (root.TryGetProperty(key, out var inner))
@@ -116,7 +115,7 @@ static string? TryExtractText(object? resultObj, int maxChars = 16000)
     if (!string.IsNullOrWhiteSpace(contentVal))
         return contentVal.Length > maxChars ? contentVal[..maxChars] : contentVal;
 
-    return null; // keeping this simple now — BinaryData will be handled separately
+    return null;
 }
 
 static async Task<object> AnalyzeTextAsync(string text, TextAnalyticsClient taClient)
@@ -129,7 +128,6 @@ static async Task<object> AnalyzeTextAsync(string text, TextAnalyticsClient taCl
     string? summary = null;
     string? taError = null;
 
-    // Language + Key Phrases
     try
     {
         var lang = await taClient.DetectLanguageAsync(sample);
@@ -149,16 +147,12 @@ static async Task<object> AnalyzeTextAsync(string text, TextAnalyticsClient taCl
         taError = $"Language/KeyPhrases failed: {ex.Message}";
     }
 
-    // Extractive summarization (with simple fallback)
     try
     {
         var docs = new List<string> { sample };
         var actions = new TextAnalyticsActions
         {
-            ExtractiveSummarizeActions = new List<ExtractiveSummarizeAction>
-            {
-                new ExtractiveSummarizeAction()
-            }
+            ExtractiveSummarizeActions = new List<ExtractiveSummarizeAction> { new() }
         };
 
         var op = await taClient.StartAnalyzeActionsAsync(docs, actions);
@@ -208,10 +202,7 @@ static async Task<object> AnalyzeTextAsync(string text, TextAnalyticsClient taCl
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen(c =>
-{
-    c.EnableAnnotations();
-});
+builder.Services.AddSwaggerGen(c => c.EnableAnnotations());
 builder.Services.AddControllers();
 
 string langEndpoint;
@@ -224,8 +215,6 @@ var environment = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT");
 
 if (environment == "Development")
 {
-    var env = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT");
-
     // Only load env file in Development
     if (Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") == "Development")
     {
@@ -242,12 +231,11 @@ if (environment == "Development")
         Console.WriteLine(Environment.GetEnvironmentVariable("AI_LANGUAGE_ENDPOINT"));
     }
 
-    // logging
     Console.WriteLine($"Environment: {environment}");
-    langEndpoint = Environment.GetEnvironmentVariable("AI_LANGUAGE_ENDPOINT");
-    langKey = Environment.GetEnvironmentVariable("AI_LANGUAGE_KEY");
-    diEndpoint = Environment.GetEnvironmentVariable("AI_DOCINTEL_ENDPOINT");
-    diKey = Environment.GetEnvironmentVariable("AI_DOCINTEL_KEY");
+    langEndpoint = Environment.GetEnvironmentVariable("AI_LANGUAGE_ENDPOINT")!;
+    langKey = Environment.GetEnvironmentVariable("AI_LANGUAGE_KEY")!;
+    diEndpoint = Environment.GetEnvironmentVariable("AI_DOCINTEL_ENDPOINT")!;
+    diKey = Environment.GetEnvironmentVariable("AI_DOCINTEL_KEY")!;
 }
 else
 {
@@ -281,9 +269,9 @@ app.MapGet("/healthz", () => Results.Ok("OK"));
 // MVC / attribute-routed controllers
 app.MapControllers();
 
-// ---------- POST /summarize/document (file upload) ----------
+// ---------- POST /summarize/document (file upload; stable JSON body approach) ----------
 app.MapPost("/summarize/document",
-    async (IFormFile document,                 // <-- no [FromForm] on IFormFile
+    async (IFormFile document,
            DocumentIntelligenceClient diClient,
            TextAnalyticsClient taClient) =>
     {
@@ -300,6 +288,7 @@ app.MapPost("/summarize/document",
 
         try
         {
+            // Using the same, known-good JSON payload style to avoid SDK signature issues
             var diOp = await diClient.AnalyzeDocumentAsync(
                 WaitUntil.Completed,
                 modelId: "prebuilt-read",
@@ -321,13 +310,13 @@ app.MapPost("/summarize/document",
                 {
                     try
                     {
-                        using var j = System.Text.Json.JsonDocument.Parse(bdValue.ToString());
+                        using var j = JsonDocument.Parse(bdValue.ToString());
                         var keys = new List<string>();
                         foreach (var p in j.RootElement.EnumerateObject()) keys.Add(p.Name);
                         foreach (var c in new[] { "result", "analyzeResult" })
                         {
                             if (j.RootElement.TryGetProperty(c, out var inner) &&
-                                inner.ValueKind == System.Text.Json.JsonValueKind.Object)
+                                inner.ValueKind == JsonValueKind.Object)
                             {
                                 keys.Add(c + ":{ " + string.Join(",", inner.EnumerateObject().Select(o => o.Name)) + " }");
                             }
@@ -378,11 +367,10 @@ app.MapPost("/summarize/document",
     .ProducesProblem(StatusCodes.Status400BadRequest)
     .DisableAntiforgery();
 
-// ---------- POST /summarize/text (form text box) ----------
+// ---------- POST /summarize/text (raw text body) ----------
 app.MapPost("/summarize/text",
         async (HttpRequest req, TextAnalyticsClient taClient) =>
         {
-            // Read the raw text body
             using var reader = new StreamReader(req.Body, leaveOpen: false);
             var text = await reader.ReadToEndAsync();
 
