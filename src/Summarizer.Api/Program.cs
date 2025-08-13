@@ -8,6 +8,7 @@ using Swashbuckle.AspNetCore.Annotations;
 using System.Text;
 using System.Text.Json;
 using System.Linq;
+using System.Diagnostics;
 
 // ---------- Helpers ----------
 static string? TryExtractTextFromBinaryData(BinaryData bd, int maxChars = 16000)
@@ -215,17 +216,11 @@ var environment = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT");
 
 if (environment == "Development")
 {
-    // Only load env file in Development
     if (Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") == "Development")
     {
-        // Get project root (where Summarizer.Api.csproj lives)
         string projectRoot = Directory.GetParent(AppContext.BaseDirectory)?.Parent?.Parent?.Parent?.FullName
                              ?? throw new InvalidOperationException("Unable to locate project root");
-
-        // Build full path to localvar.env
         string envPath = Path.Combine(projectRoot, "localvar.env");
-
-        // Load the file
         Env.Load(envPath);
         Console.WriteLine($"Loaded environment variables from: {envPath}");
         Console.WriteLine(Environment.GetEnvironmentVariable("AI_LANGUAGE_ENDPOINT"));
@@ -258,7 +253,7 @@ var app = builder.Build();
 
 app.UseHttpsRedirection();
 
-// ? Enable Swagger in all environments (so Azure shows it)
+// ? Swagger always on (easier verification in Azure)
 app.UseSwagger();
 app.UseSwaggerUI();
 
@@ -266,17 +261,26 @@ app.UseSwaggerUI();
 app.MapGet("/", () => Results.Redirect("/swagger"));
 app.MapGet("/healthz", () => Results.Ok("OK"));
 
-// MVC / attribute-routed controllers
+// Controllers
 app.MapControllers();
 
-// ---------- POST /summarize/document (file upload; stable JSON body approach) ----------
+// ---------- POST /summarize/document (file upload; fast: pages + timeout) ----------
 app.MapPost("/summarize/document",
-    async (IFormFile document,
+    async (HttpRequest req,
+           IFormFile document,
            DocumentIntelligenceClient diClient,
            TextAnalyticsClient taClient) =>
     {
         if (document is null || document.Length == 0)
             return Results.BadRequest(new { error = "No file uploaded for 'document'." });
+
+        // Query params
+        var pagesParam = req.Query["pages"].FirstOrDefault();
+        var pages = string.IsNullOrWhiteSpace(pagesParam) ? "1-5" : pagesParam;
+
+        int timeoutSeconds = 45;
+        if (int.TryParse(req.Query["timeoutSeconds"].FirstOrDefault(), out var t) && t > 0 && t <= 180)
+            timeoutSeconds = t;
 
         await using var ms = new MemoryStream();
         await document.CopyToAsync(ms);
@@ -286,11 +290,16 @@ app.MapPost("/summarize/document",
         string? diDiagnostic = null;
         string? extractedText = null;
 
+        var sw = Stopwatch.StartNew();
+
         try
         {
-            // Using the same, known-good JSON payload style to avoid SDK signature issues
+            // Limit pages via options; pass body as JSON (stable across SDK versions)
+            var options = new AnalyzeDocumentOptions();
+            options.Pages.Add(pages);
+
             var diOp = await diClient.AnalyzeDocumentAsync(
-                WaitUntil.Completed,
+                waitUntil: WaitUntil.Completed,
                 modelId: "prebuilt-read",
                 content: BinaryData.FromObjectAsJson(new
                 {
@@ -298,7 +307,9 @@ app.MapPost("/summarize/document",
                     contentType = string.IsNullOrWhiteSpace(document.ContentType)
                                     ? "application/pdf"
                                     : document.ContentType
-                })
+                }),
+                options: options,
+                cancellationToken: new CancellationTokenSource(TimeSpan.FromSeconds(timeoutSeconds)).Token
             );
 
             var resultObj = diOp.Value;
@@ -331,10 +342,16 @@ app.MapPost("/summarize/document",
                 extractedText = TryExtractText(resultObj, 16000);
             }
         }
+        catch (TaskCanceledException)
+        {
+            diError = $"Timed out after {timeoutSeconds}s while reading pages '{pages}'. Try fewer pages (e.g., 1-2).";
+        }
         catch (Exception ex)
         {
             diError = ex.Message;
         }
+
+        var diMs = sw.ElapsedMilliseconds;
 
         if (string.IsNullOrWhiteSpace(extractedText))
         {
@@ -342,27 +359,33 @@ app.MapPost("/summarize/document",
             {
                 fileName = document.FileName,
                 length = document.Length,
+                pages,
+                diMs,
                 detectedLanguage = (string?)null,
                 detectedLanguageIso = (string?)null,
                 summary = (string?)null,
                 keywords = Array.Empty<string>(),
                 textPreview = (string?)null,
-                documentIntelligenceError = diError,
+                documentIntelligenceError = diError ?? "No text extracted.",
                 diDiagnostic,
-                textAnalyticsError = "No text extracted to analyze."
+                textAnalyticsError = "Skipped because no text to analyze."
             });
         }
 
         var analysis = await AnalyzeTextAsync(extractedText, taClient);
+        var totalMs = sw.ElapsedMilliseconds;
 
         return Results.Ok(new
         {
             fileName = document.FileName,
             length = document.Length,
+            pages,
+            diMs,
+            totalMs,
             analysis
         });
     })
-    .WithMetadata(new ConsumesAttribute("multipart/form-data"))  // keeps Swagger file chooser
+    .WithMetadata(new ConsumesAttribute("multipart/form-data"))
     .Produces(StatusCodes.Status200OK)
     .ProducesProblem(StatusCodes.Status400BadRequest)
     .DisableAntiforgery();
