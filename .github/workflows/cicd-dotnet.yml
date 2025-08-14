@@ -1,0 +1,105 @@
+name: CI – Build & Test .NET App (CD via SP, no slot)
+
+on:
+  push:
+    branches: [ main ]
+    paths: [ 'src/**', '.github/workflows/**' ]
+  pull_request:
+    branches: [ main ]
+    paths: [ 'src/**', '.github/workflows/**' ]
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_VERSION: 8.0.x
+  API_PROJECT: src/Summarizer.Api/Summarizer.Api.csproj
+  AZURE_RG: rg-summarizer-dev
+  AZURE_APP: summarizer-api-dev
+
+jobs:
+  dotnet-build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🔐 Scan for Secrets
+        uses: trufflesecurity/trufflehog@main
+
+      - name: 🧰 Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: 🛠 Restore & Build
+        run: |
+          dotnet restore ./src/AiSummarizer.sln
+          dotnet build ./src/AiSummarizer.sln --no-restore -c Release
+
+      - name: ✅ Unit Tests
+        run: dotnet test ./src/Summarizer.Tests/Summarizer.Tests.csproj -c Release --no-build
+
+      - name: 📊 Code Coverage
+        run: dotnet test ./src/Summarizer.Tests/Summarizer.Tests.csproj --collect:"XPlat Code Coverage"
+
+      - name: 📦 Publish API
+        run: dotnet publish ${{ env.API_PROJECT }} -c Release -o ./publish
+
+      - name: ⬆️ Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: webapi-drop
+          path: ./publish
+
+  deploy-dev:
+    needs: dotnet-build-and-test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: dev
+    concurrency:
+      group: appservice-dev
+      cancel-in-progress: false
+    steps:
+      - name: 📥 Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: webapi-drop
+          path: ./publish
+
+      - name: 🔐 Azure login (service principal)
+        uses: azure/login@v2
+        with:
+          creds: >
+            {
+              "clientId": "${{ secrets.ARM_CLIENT_ID }}",
+              "clientSecret": "${{ secrets.ARM_CLIENT_SECRET }}",
+              "tenantId": "${{ secrets.ARM_TENANT_ID }}",
+              "subscriptionId": "${{ secrets.ARM_SUBSCRIPTION_ID }}"
+            }
+
+      - name: 📦 Zip package for ZipDeploy
+        run: |
+          cd ./publish
+          zip -r ../package.zip .
+          cd -
+
+      - name: 🚀 Deploy to App Service (prod site)
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ env.AZURE_APP }}
+          package: package.zip
+
+      - name: 🔧 Show critical app settings (debug)
+        uses: azure/cli@v2
+        with:
+          inlineScript: |
+            az webapp config appsettings list -g $AZURE_RG -n $AZURE_APP \
+              --query "[?name=='WEBSITE_RUN_FROM_PACKAGE' || name=='SCM_DO_BUILD_DURING_DEPLOYMENT']"
+
+      - name: 🔄 Restart App Service
+        uses: azure/cli@v2
+        with:
+          inlineScript: |
+            az webapp restart -g $AZURE_RG -n $AZURE_APP
