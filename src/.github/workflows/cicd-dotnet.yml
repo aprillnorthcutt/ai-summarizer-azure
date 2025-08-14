@@ -15,8 +15,8 @@ permissions:
 env:
   DOTNET_VERSION: 8.0.x
   API_PROJECT: src/Summarizer.Api/Summarizer.Api.csproj
-  AZURE_RG: rg-aiportfolio
-  AZURE_APP: keywordvista
+  AZURE_RG: rg-summarizer-dev
+  AZURE_APP: summarizer-api-dev
 
 jobs:
   dotnet-build-and-test:
