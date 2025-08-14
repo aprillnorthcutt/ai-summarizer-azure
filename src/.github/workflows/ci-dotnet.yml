@@ -1,0 +1,37 @@
+name: CI – Build & Test .NET App
+
+on:
+  push:
+    branches: [main]
+    paths: ['src/**']
+  pull_request:
+    branches: [main]
+    paths: ['src/**']
+
+jobs:
+  dotnet-build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: 📥 Checkout code
+      uses: actions/checkout@v3
+
+    - name: 🔐 Scan for Secrets
+      uses: trufflesecurity/trufflehog@main
+
+    - name: 🧰 Set up .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: 8.0.x
+
+    - name: 🛠 Restore and build .NET
+      run: |
+        dotnet restore ./src/AiSummarizer.sln
+        dotnet build ./src/AiSummarizer.sln --no-restore --configuration Release       
+
+    - name: ✅ Run Tests
+      run: dotnet test ./src/Summarizer.Tests/Summarizer.Tests.csproj
+
+    - name: 📊 Collect Code Coverage
+      run: |
+        dotnet test ./src/Summarizer.Tests/Summarizer.Tests.csproj --collect:"XPlat Code Coverage"

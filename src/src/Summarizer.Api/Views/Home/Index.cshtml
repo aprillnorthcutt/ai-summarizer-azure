@@ -1,0 +1,26 @@
+﻿@{
+    ViewData["Title"] = "Document Summarizer";
+}
+
+<h2>Document Summarizer</h2>
+
+<form asp-controller="Home" asp-action="Index" method="post" enctype="multipart/form-data">
+    <div>
+        <label>Select a document:</label>
+        <input type="file" name="document" />
+    </div>
+    <div>
+        <button type="submit">Upload & Summarize</button>
+    </div>
+</form>
+
+@if (ViewBag.Error != null)
+{
+    <div style="color:red;">@ViewBag.Error</div>
+}
+
+@if (ViewBag.Summary != null)
+{
+    <h3>Summary:</h3>
+    <p>@ViewBag.Summary</p>
+}

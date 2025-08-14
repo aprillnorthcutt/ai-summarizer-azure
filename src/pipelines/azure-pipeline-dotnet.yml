@@ -1,0 +1,162 @@
+# Run name: branch + date + rev
+name: '$(Build.SourceBranchName)-$(Date:yyyy.MM.dd)-$(Rev:rr)'
+
+trigger:
+  branches: { include: [ main ] }
+  paths:    { include: [ src/**, **/*.sln ] }
+
+pr:
+  branches: { include: [ main ] }
+  paths:    { include: [ src/**, **/*.sln ] }
+
+variables:
+  SERVICE_CONNECTION: 'sc-azure-summarizer'
+  BUILD_VERSION: '$(Build.SourceBranchName)-$(Build.SourceVersionShort)'
+
+  # Web project & artifact
+  WEB_PROJECT: '**/YourWebProject.csproj'     # <-- change to your web csproj
+  ARTIFACT_NAME: 'web-$(Build.BuildNumber)'
+
+  # App names & resource groups
+  WEB_APP_DEV:  'app-summarizer-dev'          # <-- change to your dev app
+  RG_DEV:       'rg-summarizer-dev'           # <-- change to your dev RG
+  WEB_APP_PROD: 'app-summarizer-prod'         # <-- change to your prod app
+  RG_PROD:      'rg-summarizer-prod'          # <-- change to your prod RG
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+stages:
+# ================= BUILD =================
+- stage: Build
+  displayName: "Build, Test, Package (.NET)"
+  jobs:
+  - job: build
+    steps:
+    - checkout: self
+
+    - task: Cache@2
+      displayName: Cache NuGet
+      inputs:
+        key: 'nuget | "$(Agent.OS)" | **/packages.lock.json'
+        restoreKeys: |
+          nuget | "$(Agent.OS)"
+        path: '$(Pipeline.Workspace)/.nuget/packages'
+
+    - task: UseDotNet@2
+      inputs:
+        packageType: 'sdk'
+        version: '8.x'
+
+    - task: DotNetCoreCLI@2
+      displayName: Restore
+      inputs:
+        command: 'restore'
+        projects: '**/*.sln'
+
+    - task: DotNetCoreCLI@2
+      displayName: Build
+      inputs:
+        command: 'build'
+        projects: '**/*.sln'
+        arguments: '--configuration Release --no-restore'
+
+    - task: DotNetCoreCLI@2
+      displayName: Test
+      inputs:
+        command: 'test'
+        projects: '**/*Tests/*.csproj'
+        arguments: '--configuration Release --no-build --collect:"XPlat Code Coverage"'
+        publishTestResults: true
+
+    - task: DotNetCoreCLI@2
+      displayName: Publish Web
+      inputs:
+        command: 'publish'
+        publishWebProjects: false
+        projects: '$(WEB_PROJECT)'
+        arguments: '--configuration Release --output $(Build.ArtifactStagingDirectory)'
+        zipAfterPublish: true
+
+    - task: PublishPipelineArtifact@1
+      displayName: Publish Artifact (versioned)
+      inputs:
+        targetPath: '$(Build.ArtifactStagingDirectory)'
+        artifact: '$(ARTIFACT_NAME)'
+
+# ================= DEPLOY DEV =================
+- stage: Deploy_Dev
+  displayName: "Deploy to Dev"
+  dependsOn: Build
+  condition: and(succeeded(), ne(variables['Build.Reason'], 'PullRequest'))
+  variables:
+  - group: app-azure-dev                  # <-- variable group with app secrets for DEV
+  environment: 'dev'                      # approvals/checks in DevOps → Environments
+  jobs:
+  - job: deploy_dev
+    steps:
+    - download: current
+      artifact: '$(ARTIFACT_NAME)'
+
+    - task: AzureWebApp@1
+      displayName: Deploy Web App (Dev)
+      inputs:
+        azureSubscription: '$(SERVICE_CONNECTION)'
+        appName: '$(WEB_APP_DEV)'
+        package: '$(Pipeline.Workspace)/$(ARTIFACT_NAME)/**/*.zip'
+
+    # Set/override app settings (includes build_version)
+    - task: AzureCLI@2
+      displayName: Set App Settings (Dev)
+      inputs:
+        azureSubscription: '$(SERVICE_CONNECTION)'
+        scriptType: bash
+        scriptLocation: inlineScript
+        inlineScript: |
+          az webapp config appsettings set \
+            --name "$(WEB_APP_DEV)" \
+            --resource-group "$(RG_DEV)" \
+            --settings \
+              build_version="$(BUILD_VERSION)" \
+              ASPNETCORE_ENVIRONMENT="Development" \
+              APPLICATIONINSIGHTS_CONNECTION_STRING="$(APPLICATIONINSIGHTS_CONNECTION_STRING)" \
+              COGNITIVE_ENDPOINT="$(COGNITIVE_ENDPOINT)" \
+              COGNITIVE_KEY="$(COGNITIVE_KEY)"
+
+# ================= DEPLOY PROD =================
+- stage: Deploy_Prod
+  displayName: "Deploy to Prod"
+  dependsOn: Deploy_Dev
+  condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+  variables:
+  - group: app-azure-prod                 # <-- variable group with app secrets for PROD
+  environment: 'prod'                     # approvals/checks in DevOps → Environments
+  jobs:
+  - job: deploy_prod
+    steps:
+    - download: current
+      artifact: '$(ARTIFACT_NAME)'
+
+    - task: AzureWebApp@1
+      displayName: Deploy Web App (Prod)
+      inputs:
+        azureSubscription: '$(SERVICE_CONNECTION)'
+        appName: '$(WEB_APP_PROD)'
+        package: '$(Pipeline.Workspace)/$(ARTIFACT_NAME)/**/*.zip'
+
+    - task: AzureCLI@2
+      displayName: Set App Settings (Prod)
+      inputs:
+        azureSubscription: '$(SERVICE_CONNECTION)'
+        scriptType: bash
+        scriptLocation: inlineScript
+        inlineScript: |
+          az webapp config appsettings set \
+            --name "$(WEB_APP_PROD)" \
+            --resource-group "$(RG_PROD)" \
+            --settings \
+              build_version="$(BUILD_VERSION)" \
+              ASPNETCORE_ENVIRONMENT="Production" \
+              APPLICATIONINSIGHTS_CONNECTION_STRING="$(APPLICATIONINSIGHTS_CONNECTION_STRING)" \
+              COGNITIVE_ENDPOINT="$(COGNITIVE_ENDPOINT)" \
+              COGNITIVE_KEY="$(COGNITIVE_KEY)"

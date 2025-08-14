@@ -1,0 +1,26 @@
+tenanet id 04a3d51e-4999-4460-ab6f-979b00119015
+subscription id 4e90b828-caf5-4be8-bf30-8be300f3d900
+
+
+az login
+az account set --subscription "4e90b828-caf5-4be8-bf30-8be300f3d900"
+
+
+
+
+{
+  "environmentName": "AzureCloud",
+  "homeTenantId": "04a3d51e-4999-4460-ab6f-979b00119015",
+  "id": "4e90b828-caf5-4be8-bf30-8be300f3d900",
+  "isDefault": true,
+  "managedByTenants": [],
+  "name": "Subscription 1",
+  "state": "Enabled",
+  "tenantDefaultDomain": "aprillnorthcuttgmail.onmicrosoft.com",
+  "tenantDisplayName": "Default Directory",
+  "tenantId": "04a3d51e-4999-4460-ab6f-979b00119015",
+  "user": {
+    "name": "april.l.northcutt@gmail.com",
+    "type": "user"
+  }
+}

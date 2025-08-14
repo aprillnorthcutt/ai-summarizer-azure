@@ -1,0 +1,45 @@
+@baseUrl = https://localhost:7230
+
+# ### Health
+GET {{baseUrl}}/whoami
+
+### Summarize (JSON text)
+POST {{baseUrl}}/summarize/text
+Content-Type: application/json
+
+{
+  "text": "Artificial intelligence is transforming industries. It drives efficiency, lowers costs, and enables new capabilities. Responsible AI is equally important to avoid bias and protect privacy."
+}
+
+### Summarize (TXT file)
+POST {{baseUrl}}/summarize/file
+Content-Type: multipart/form-data; boundary=B1
+
+--B1
+Content-Disposition: form-data; name="document"; filename="article.txt"
+Content-Type: text/plain
+
+< ./samples/article.txt
+--B1--
+
+### Summarize (PDF file)
+POST {{baseUrl}}/summarize/file
+Content-Type: multipart/form-data; boundary=B2
+
+--B2
+Content-Disposition: form-data; name="document"; filename="newsletter.pdf"
+Content-Type: application/pdf
+
+< ./samples/newsletter.pdf
+--B2--
+
+### Summarize (DOCX file)
+POST {{baseUrl}}/summarize/file
+Content-Type: multipart/form-data; boundary=B3
+
+--B3
+Content-Disposition: form-data; name="document"; filename="meeting_notes.docx"
+Content-Type: application/vnd.openxmlformats-officedocument.wordprocessingml.document
+
+< ./samples/meeting_notes.docx
+--B3--
