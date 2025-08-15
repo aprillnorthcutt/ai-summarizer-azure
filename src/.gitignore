@@ -6,6 +6,7 @@
 
 # dotenv files
 .env
+*localvar.env
 
 # User-specific files
 *.rsuser
@@ -522,3 +523,4 @@ crash.log
 *.key
 *.crt
 >>>>>>> origin/main
+/Summarizer.Api/localvar.env
