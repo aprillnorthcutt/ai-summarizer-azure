@@ -13,6 +13,18 @@ The infrastructure, CI/CD pipeline, and application code were all developed by m
 
 ---
 
+## 🚀 **Try It Now – Live Demo**  
+
+🎯 **Test the AI-Powered Document Summarizer instantly:**  
+🔗 **[Click here to launch on Azure](https://keywordvista.azurewebsites.net/)**  
+
+> 💡 **How to use:**  
+> - **/summarize/document** → Upload `.png`, `.pdf`, or `.docx` files (more formats coming soon).  
+> - **/summarize/text** → Paste or type text directly into the text box.  
+> - Front end is **Swagger UI** for now — a dedicated UI is planned.
+
+---
+
 ## 💡 Use Case
 
 Designed for consulting-style scenarios where teams need to:
