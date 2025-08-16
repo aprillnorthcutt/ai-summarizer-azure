@@ -66,14 +66,18 @@ static string? TryExtractTextFromAnalyzeResult(AnalyzeResult ar, int maxChars = 
     return null;
 }
 
-static async Task<string> GetAbstractiveSummaryAsync(OpenAIClient client, string deploymentName, string input)
+static async Task<string> GetAbstractiveSummaryAsync(OpenAIClient client, string deploymentName, string input, int? sentenceCount = null)
 {
+    string userPrompt = sentenceCount.HasValue
+        ? $"Summarize the following text in exactly {sentenceCount.Value} sentence(s):\n\n{input}"
+        : $"Summarize the following text clearly and concisely:\n\n{input}";
+
     var options = new ChatCompletionsOptions
     {
         Messages =
         {
             new ChatMessage(ChatRole.System, "You summarize text in a concise and professional way."),
-            new ChatMessage(ChatRole.User, $"Summarize the following:\n\n{input}")
+            new ChatMessage(ChatRole.User, userPrompt)
         },
         Temperature = 0.5f,
         MaxTokens = 512
@@ -82,6 +86,7 @@ static async Task<string> GetAbstractiveSummaryAsync(OpenAIClient client, string
     var response = await client.GetChatCompletionsAsync(deploymentName, options);
     return response.Value.Choices[0].Message.Content.Trim();
 }
+
 
 
 int ClampSentences(int? n) => Math.Clamp(n ?? 6, 3, 20); // adjust default and max
@@ -320,37 +325,59 @@ app.MapPost("/summarize/text",
     .ProducesProblem(StatusCodes.Status400BadRequest)
     .DisableAntiforgery();
 
+//app.MapPost("/summarize/abstractive", async (
+//    OpenAIClient openAIClient,
+//    [FromBody] AbstractiveRequest request) =>
+//{
+//    string deploymentName = "abstractive-gpt"; // update this if your deployment name is different
+//    string inputText = request.Text ?? string.Empty;
+
+//    string userPrompt = request.SentenceCount.HasValue
+//        ? $"Summarize the following text in exactly {request.SentenceCount.Value} sentence(s): {inputText}"
+//        : $"Summarize the following text clearly and concisely: {inputText}";
+
+//    var chatOptions = new ChatCompletionsOptions
+//    {
+//        Temperature = 0.5f,
+//        MaxTokens = 500
+//    };
+
+//    chatOptions.Messages.Add(new ChatMessage(ChatRole.System, "You are a helpful assistant that summarizes text."));
+//    chatOptions.Messages.Add(new ChatMessage(ChatRole.User, userPrompt));
+
+//    Response<ChatCompletions> response = await openAIClient.GetChatCompletionsAsync(deploymentName, chatOptions);
+//    string summary = response.Value.Choices[0].Message.Content;
+
+//    return Results.Ok(new { summary });
+//});
+
 app.MapPost("/summarize/abstractive", async (
     OpenAIClient openAIClient,
     [FromBody] AbstractiveRequest request) =>
 {
-    var messages = new List<ChatMessage>
-    {
-        new ChatMessage(ChatRole.System, "You are a helpful assistant that summarizes text into clear and concise summaries."),
-        new ChatMessage(ChatRole.User, $"Summarize the following text in {request.SentenceCount} sentence(s): {request.Text}")
-    };
+    string deploymentName = "abstractive-gpt";
+    string inputText = request.Text ?? string.Empty;
 
-    var options = new ChatCompletionsOptions
+    string userPrompt = request.SentenceCount.HasValue
+        ? $"Summarize the following text in exactly {request.SentenceCount.Value} sentence(s): {inputText}"
+        : $"Summarize the following text clearly and concisely: {inputText}";
+
+    var chatOptions = new ChatCompletionsOptions
     {
         Temperature = 0.5f,
-        MaxTokens = 500
+        MaxTokens = 500,
+        Messages =
+        {
+            new ChatMessage(ChatRole.System, "You are a helpful assistant that summarizes text."),
+            new ChatMessage(ChatRole.User, userPrompt)
+        }
     };
 
-    foreach (var message in messages)
-    {
-        options.Messages.Add(message);
-    }
-
-    var deploymentName = Environment.GetEnvironmentVariable("OPENAI_DEPLOYMENT")
-                         ?? throw new InvalidOperationException("OPENAI_DEPLOYMENT not set");
-
-    var response = await openAIClient.GetChatCompletionsAsync(deploymentName, options);
-
-    var summary = response.Value.Choices[0].Message.Content;
+    var response = await openAIClient.GetChatCompletionsAsync(deploymentName, chatOptions);
+    string summary = response.Value.Choices[0].Message.Content;
 
     return Results.Ok(new { summary });
 });
-
 
 
 
