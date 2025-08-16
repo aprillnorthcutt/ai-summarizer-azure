@@ -9,13 +9,16 @@ using System.Diagnostics;
 using System.Text.RegularExpressions;
 
 using Azure;
+using Azure.AI.OpenAI;
 using Azure.AI.DocumentIntelligence;
 using Azure.AI.TextAnalytics;
 
 using DotNetEnv;
 using Microsoft.AspNetCore.Mvc;
+
 using Summarizer.Api.Models;
 using Swashbuckle.AspNetCore.Annotations;
+
 
 
 
@@ -63,7 +66,25 @@ static string? TryExtractTextFromAnalyzeResult(AnalyzeResult ar, int maxChars = 
     return null;
 }
 
-static int ClampSentences(int? n) => Math.Clamp(n ?? 5, 1, 10);
+static async Task<string> GetAbstractiveSummaryAsync(OpenAIClient client, string deploymentName, string input)
+{
+    var options = new ChatCompletionsOptions
+    {
+        Messages =
+        {
+            new ChatMessage(ChatRole.System, "You summarize text in a concise and professional way."),
+            new ChatMessage(ChatRole.User, $"Summarize the following:\n\n{input}")
+        },
+        Temperature = 0.5f,
+        MaxTokens = 512
+    };
+
+    var response = await client.GetChatCompletionsAsync(deploymentName, options);
+    return response.Value.Choices[0].Message.Content.Trim();
+}
+
+
+int ClampSentences(int? n) => Math.Clamp(n ?? 6, 3, 20); // adjust default and max
 
 static async Task<object> AnalyzeTextAsync(string text, TextAnalyticsClient taClient, int sentenceCount)
 {
@@ -99,8 +120,15 @@ static async Task<object> AnalyzeTextAsync(string text, TextAnalyticsClient taCl
         var docs = new List<string> { sample };
         var actions = new TextAnalyticsActions
         {
-            ExtractiveSummarizeActions = new List<ExtractiveSummarizeAction> { new() }
+            ExtractiveSummarizeActions = new List<ExtractiveSummarizeAction>
+            {
+                new ExtractiveSummarizeAction
+                {
+                    MaxSentenceCount = sentenceCount
+                }
+            }
         };
+
 
         var op = await taClient.StartAnalyzeActionsAsync(docs, actions);
         await op.WaitForCompletionAsync();
@@ -155,7 +183,7 @@ builder.Services.AddSwaggerGen(c => c.EnableAnnotations());
 builder.Services.AddControllers();
 builder.Services.AddAntiforgery();
 
-string langEndpoint, langKey, diEndpoint, diKey;
+string langEndpoint, langKey, diEndpoint, diKey, openAiEndpoint, openAiKey, openAiDeployment;
 
 var environment = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT");
 
@@ -170,6 +198,11 @@ if (environment == "Development")
     langKey = Environment.GetEnvironmentVariable("AI_LANGUAGE_KEY") ?? throw new InvalidOperationException("AI_LANGUAGE_KEY not set");
     diEndpoint = Environment.GetEnvironmentVariable("AI_DOCINTEL_ENDPOINT") ?? throw new InvalidOperationException("AI_DOCINTEL_ENDPOINT not set");
     diKey = Environment.GetEnvironmentVariable("AI_DOCINTEL_KEY") ?? throw new InvalidOperationException("AI_DOCINTEL_KEY not set");
+
+    openAiEndpoint = Environment.GetEnvironmentVariable("OPENAI_ENDPOINT") ?? throw new InvalidOperationException("OPENAI_ENDPOINT not set");
+    openAiKey = Environment.GetEnvironmentVariable("OPENAI_KEY") ?? throw new InvalidOperationException("OPENAI_KEY not set");
+    openAiDeployment = Environment.GetEnvironmentVariable("OPENAI_DEPLOYMENT") ?? throw new InvalidOperationException("OPENAI_DEPLOYMENT not set");
+
 }
 else
 {
@@ -177,10 +210,18 @@ else
     langKey = Environment.GetEnvironmentVariable("AI_LANGUAGE_KEY") ?? throw new InvalidOperationException("AI_LANGUAGE_KEY not set");
     diEndpoint = Environment.GetEnvironmentVariable("AI_DOCINTEL_ENDPOINT") ?? throw new InvalidOperationException("AI_DOCINTEL_ENDPOINT not set");
     diKey = Environment.GetEnvironmentVariable("AI_DOCINTEL_KEY") ?? throw new InvalidOperationException("AI_DOCINTEL_KEY not set");
+
+    openAiEndpoint = Environment.GetEnvironmentVariable("OPENAI_ENDPOINT") ?? throw new InvalidOperationException("OPENAI_ENDPOINT not set");
+    openAiKey = Environment.GetEnvironmentVariable("OPENAI_KEY") ?? throw new InvalidOperationException("OPENAI_KEY not set");
+    openAiDeployment = Environment.GetEnvironmentVariable("OPENAI_DEPLOYMENT_NAME") ?? throw new InvalidOperationException("OPENAI_DEPLOYMENT_NAME not set");
+
 }
 
 builder.Services.AddSingleton(new TextAnalyticsClient(new Uri(langEndpoint), new AzureKeyCredential(langKey)));
 builder.Services.AddSingleton(new DocumentIntelligenceClient(new Uri(diEndpoint), new AzureKeyCredential(diKey)));
+
+builder.Services.AddSingleton(new OpenAIClient(new Uri(openAiEndpoint), new AzureKeyCredential(openAiKey)));
+builder.Services.AddSingleton(_ => openAiDeployment);
 
 var app = builder.Build();
 
@@ -278,6 +319,39 @@ app.MapPost("/summarize/text",
     .Produces(StatusCodes.Status200OK)
     .ProducesProblem(StatusCodes.Status400BadRequest)
     .DisableAntiforgery();
+
+app.MapPost("/summarize/abstractive", async (
+    OpenAIClient openAIClient,
+    [FromBody] AbstractiveRequest request) =>
+{
+    var messages = new List<ChatMessage>
+    {
+        new ChatMessage(ChatRole.System, "You are a helpful assistant that summarizes text into clear and concise summaries."),
+        new ChatMessage(ChatRole.User, $"Summarize the following text in {request.SentenceCount} sentence(s): {request.Text}")
+    };
+
+    var options = new ChatCompletionsOptions
+    {
+        Temperature = 0.5f,
+        MaxTokens = 500
+    };
+
+    foreach (var message in messages)
+    {
+        options.Messages.Add(message);
+    }
+
+    var deploymentName = Environment.GetEnvironmentVariable("OPENAI_DEPLOYMENT")
+                         ?? throw new InvalidOperationException("OPENAI_DEPLOYMENT not set");
+
+    var response = await openAIClient.GetChatCompletionsAsync(deploymentName, options);
+
+    var summary = response.Value.Choices[0].Message.Content;
+
+    return Results.Ok(new { summary });
+});
+
+
 
 
 // ---------- Serve React frontend ----------

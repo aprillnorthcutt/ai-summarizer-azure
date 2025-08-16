@@ -197,16 +197,20 @@ function TextSummarizer() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
+ const [sentenceCount, setSentenceCount] = useState(3);
+
 
   const charCount = text.length;
   const disabled = loading || !text.trim();
+
 
   async function handleSummarize() {
   setError(null);
   setLoading(true);
   setResult(null);
   try {
-    const res = await fetch("/summarize/text", {
+console.log(`/summarize/text?sentences=${sentenceCount}`);
+    const res = await fetch(`/summarize/text?sentences=${sentenceCount}`, {
       method: "POST",
       headers: { "Content-Type": "text/plain" }, // ✅ MUST be text/plain
       body: text, // ✅ Raw text only, NOT JSON
@@ -227,6 +231,14 @@ function TextSummarizer() {
       <div className="grid gap-3">
         <label className="text-sm">Optional title</label>
         <Input placeholder="e.g., Quarterly update" value={title} onChange={(e) => setTitle(e.target.value)} />
+<label className="text-sm">Summary length (sentences)</label>
+<Input
+  type="number"
+  min={1}
+  max={20}
+  value={sentenceCount}
+  onChange={(e) => setSentenceCount(Number(e.target.value))}
+/>
         <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
           <label>Text</label>
           <span>{charCount.toLocaleString()} characters</span>
