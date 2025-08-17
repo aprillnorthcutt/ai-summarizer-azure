@@ -184,7 +184,7 @@ static async Task<object> AnalyzeTextAsync(string text, TextAnalyticsClient taCl
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen(c => c.EnableAnnotations());
+//builder.Services.AddSwaggerGen(c => c.EnableAnnotations());
 builder.Services.AddControllers();
 builder.Services.AddAntiforgery();
 
@@ -231,11 +231,12 @@ builder.Services.AddSingleton(_ => openAiDeployment);
 var app = builder.Build();
 
 app.UseHttpsRedirection();
-app.UseSwagger();
-app.UseSwaggerUI();
+//app.UseSwagger();
+//app.UseSwaggerUI();
 app.UseAntiforgery();
-app.UseDefaultFiles();
-app.UseStaticFiles();
+app.UseDefaultFiles();     // looks for index.html
+app.UseStaticFiles();      // serves files from wwwroot/
+app.MapFallbackToFile("index.html"); // SPA fallback
 
 // ---------- POST /summarize/document ----------
 app.MapPost("/summarize/document",
@@ -382,7 +383,7 @@ app.MapPost("/summarize/abstractive", async (
 
 
 // ---------- Serve React frontend ----------
-app.MapFallbackToFile("index.html").DisableAntiforgery();
+//app.MapFallbackToFile("index.html").DisableAntiforgery();
 
 
 
