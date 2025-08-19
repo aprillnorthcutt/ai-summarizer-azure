@@ -1,9 +1,6 @@
 ﻿
 using System;
-using System.IO;
 using System.Text;
-using System.Text.Json;
-using System.Linq;
 
 using System.Diagnostics;
 using System.Text.RegularExpressions;
@@ -12,13 +9,8 @@ using Azure;
 using Azure.AI.OpenAI;
 using Azure.AI.DocumentIntelligence;
 using Azure.AI.TextAnalytics;
-
 using DotNetEnv;
 using Microsoft.AspNetCore.Mvc;
-
-using Summarizer.Api.Models;
-using Swashbuckle.AspNetCore.Annotations;
-
 
 
 
@@ -87,6 +79,30 @@ static async Task<string> GetAbstractiveSummaryAsync(OpenAIClient client, string
     return response.Value.Choices[0].Message.Content.Trim();
 }
 
+static string[] CleanKeywords(IEnumerable<string> rawKeywords)
+{
+    var blacklist = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+    {
+        "sentence count", "key sentences", "new language",
+        "original words", "term frequency", "text preview"
+    };
+
+    return rawKeywords
+        .Select(k => k.TrimStart()) // Trim whitespace from start
+        .Select(k => k.StartsWith("n") && k.Length > 2 && char.IsUpper(k[1])
+            ? k.Substring(1) : k) // Remove leading 'n' if it's a weird prefix
+        .Select(k => k.Trim()) // Final trim after transformation
+        .Where(k =>
+                k.Length >= 3 &&
+                !blacklist.Contains(k) &&
+                k.Any(char.IsLetter) &&
+                !Regex.IsMatch(k, @"^[\W\d_]+$") // only symbols or digits
+        )
+        .Distinct(StringComparer.OrdinalIgnoreCase)
+        .OrderByDescending(k => k.Length)
+        .Take(15)
+        .ToArray();
+}
 
 
 int ClampSentences(int? n) => Math.Clamp(n ?? 6, 3, 20); // adjust default and max
@@ -108,12 +124,9 @@ static async Task<object> AnalyzeTextAsync(string text, TextAnalyticsClient taCl
         detectedLanguageIso = lang.Value.Iso6391Name;
 
         var kp = await taClient.ExtractKeyPhrasesAsync(sample);
-        keywords = kp.Value
-            .Where(s => !string.IsNullOrWhiteSpace(s))
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .OrderByDescending(s => s.Length)
-            .Take(25)
-            .ToArray();
+
+        keywords = CleanKeywords(kp.Value);
+
     }
     catch (Exception ex)
     {
@@ -133,7 +146,6 @@ static async Task<object> AnalyzeTextAsync(string text, TextAnalyticsClient taCl
                 }
             }
         };
-
 
         var op = await taClient.StartAnalyzeActionsAsync(docs, actions);
         await op.WaitForCompletionAsync();
@@ -159,21 +171,6 @@ static async Task<object> AnalyzeTextAsync(string text, TextAnalyticsClient taCl
                             .Select(s => s.Text.Trim()));
                     break;
                 }
-                //if (docResult != null && docResult.Sentences.Count > 0)
-                //{
-                //    foreach (var s in docResult.Sentences)
-                //    {
-                //        Console.WriteLine($"[RankScore: {s.RankScore}] {s.Text}");
-                //    }
-
-                //    summary = string.Join(" ",
-                //        docResult.Sentences
-                //            .OrderByDescending(s => s.RankScore)
-                //            .Take(sentenceCount)
-                //            .OrderBy(s => s.Offset)
-                //            .Select(s => s.Text.Trim()));
-                //    break;
-                //}
             }
             if (!string.IsNullOrWhiteSpace(summary)) break;
         }
@@ -204,7 +201,6 @@ static async Task<object> AnalyzeTextAsync(string text, TextAnalyticsClient taCl
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddEndpointsApiExplorer();
-//builder.Services.AddSwaggerGen(c => c.EnableAnnotations());
 builder.Services.AddControllers();
 builder.Services.AddAntiforgery();
 
@@ -253,8 +249,8 @@ app.UseHttpsRedirection();
 //app.UseSwagger();
 //app.UseSwaggerUI();
 app.UseAntiforgery();
-app.UseDefaultFiles();     // looks for index.html
-app.UseStaticFiles();      // serves files from wwwroot/
+app.UseDefaultFiles();  
+app.UseStaticFiles();     
 app.MapFallbackToFile("index.html");
 
 // ---------- POST /summarize/document ----------
@@ -340,7 +336,6 @@ app.MapPost("/summarize/text",
 
             return Results.Ok(analysis);
         })
-   // .WithMetadata(new ConsumesAttribute("text/plain"))
     .Produces(StatusCodes.Status200OK)
     .ProducesProblem(StatusCodes.Status400BadRequest)
     .DisableAntiforgery();
@@ -371,12 +366,8 @@ app.MapPost("/summarize/abstractive", async (
         langIso = lang.Value.Iso6391Name;
 
         var kp = await taClient.ExtractKeyPhrasesAsync(sample);
-        keywords = kp.Value
-            .Where(s => !string.IsNullOrWhiteSpace(s))
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .OrderByDescending(s => s.Length)
-            .Take(25)
-            .ToArray();
+        keywords = CleanKeywords(kp.Value);
+
     }
     catch (Exception ex)
     {
@@ -394,7 +385,7 @@ app.MapPost("/summarize/abstractive", async (
         detectedLanguageIso = langIso,
         textPreview = sample.Length > 600 ? sample[..600] + "…" : sample,
         textAnalyticsError = taError,
-       // timings = new { totalMs = sw.ElapsedMilliseconds }
+
     });
 })
 .Produces(StatusCodes.Status200OK)
