@@ -1,22 +1,30 @@
-﻿// File: src/Summarizer.Api/Program.cs
+﻿
 using System;
 using System.IO;
 using System.Text;
 using System.Text.Json;
 using System.Linq;
-using System.Collections.Generic;
+
 using System.Diagnostics;
+using System.Text.RegularExpressions;
 
 using Azure;
+using Azure.AI.OpenAI;
 using Azure.AI.DocumentIntelligence;
 using Azure.AI.TextAnalytics;
 
 using DotNetEnv;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Antiforgery;          // ✅ for .DisableAntiforgery() extensions
+
+using Summarizer.Api.Models;
 using Swashbuckle.AspNetCore.Annotations;
 
-// ---------- Helpers ----------
+
+
+
+static string NormalizeText(string s) =>
+    Regex.Replace(s ?? string.Empty, @"\s+", " ").Trim();
+
 static string? TryExtractTextFromAnalyzeResult(AnalyzeResult ar, int maxChars = 16000)
 {
     if (!string.IsNullOrWhiteSpace(ar.Content))
@@ -30,7 +38,6 @@ static string? TryExtractTextFromAnalyzeResult(AnalyzeResult ar, int maxChars = 
             if (string.IsNullOrWhiteSpace(p.Content)) continue;
             var remaining = maxChars - sb.Length;
             if (remaining <= 0) break;
-
             if (p.Content.Length > remaining) { sb.Append(p.Content.AsSpan(0, remaining)); break; }
             sb.AppendLine(p.Content);
         }
@@ -48,7 +55,6 @@ static string? TryExtractTextFromAnalyzeResult(AnalyzeResult ar, int maxChars = 
                 if (string.IsNullOrWhiteSpace(line.Content)) continue;
                 var remaining = maxChars - sb.Length;
                 if (remaining <= 0) goto Done;
-
                 if (line.Content.Length > remaining) { sb.Append(line.Content.AsSpan(0, remaining)); goto Done; }
                 sb.AppendLine(line.Content);
             }
@@ -60,7 +66,32 @@ static string? TryExtractTextFromAnalyzeResult(AnalyzeResult ar, int maxChars = 
     return null;
 }
 
-static async Task<object> AnalyzeTextAsync(string text, TextAnalyticsClient taClient)
+static async Task<string> GetAbstractiveSummaryAsync(OpenAIClient client, string deploymentName, string input, int? sentenceCount = null)
+{
+    string userPrompt = sentenceCount.HasValue
+        ? $"Summarize the following text in exactly {sentenceCount.Value} sentence(s):\n\n{input}"
+        : $"Summarize the following text clearly and concisely:\n\n{input}";
+
+    var options = new ChatCompletionsOptions
+    {
+        Messages =
+        {
+            new ChatMessage(ChatRole.System, "You summarize text in a concise and professional way."),
+            new ChatMessage(ChatRole.User, userPrompt)
+        },
+        Temperature = 0.5f,
+        MaxTokens = 512
+    };
+
+    var response = await client.GetChatCompletionsAsync(deploymentName, options);
+    return response.Value.Choices[0].Message.Content.Trim();
+}
+
+
+
+int ClampSentences(int? n) => Math.Clamp(n ?? 6, 3, 20); // adjust default and max
+
+static async Task<object> AnalyzeTextAsync(string text, TextAnalyticsClient taClient, int sentenceCount)
 {
     var sample = text.Length > 15000 ? text[..15000] : text;
 
@@ -94,8 +125,15 @@ static async Task<object> AnalyzeTextAsync(string text, TextAnalyticsClient taCl
         var docs = new List<string> { sample };
         var actions = new TextAnalyticsActions
         {
-            ExtractiveSummarizeActions = new List<ExtractiveSummarizeAction> { new() }
+            ExtractiveSummarizeActions = new List<ExtractiveSummarizeAction>
+            {
+                new ExtractiveSummarizeAction
+                {
+                    MaxSentenceCount = sentenceCount
+                }
+            }
         };
+
 
         var op = await taClient.StartAnalyzeActionsAsync(docs, actions);
         await op.WaitForCompletionAsync();
@@ -108,25 +146,48 @@ static async Task<object> AnalyzeTextAsync(string text, TextAnalyticsClient taCl
                 var docResult = exResult.DocumentsResults.FirstOrDefault();
                 if (docResult != null && docResult.Sentences.Count > 0)
                 {
+                    foreach (var s in docResult.Sentences)
+                    {
+                        Console.WriteLine($"[RankScore: {s.RankScore}] {s.Text}");
+                    }
+
                     summary = string.Join(" ",
                         docResult.Sentences
                             .OrderByDescending(s => s.RankScore)
-                            .Take(3)
+                            .Take(sentenceCount)
+                            .OrderBy(s => s.Offset)
                             .Select(s => s.Text.Trim()));
                     break;
                 }
+                //if (docResult != null && docResult.Sentences.Count > 0)
+                //{
+                //    foreach (var s in docResult.Sentences)
+                //    {
+                //        Console.WriteLine($"[RankScore: {s.RankScore}] {s.Text}");
+                //    }
+
+                //    summary = string.Join(" ",
+                //        docResult.Sentences
+                //            .OrderByDescending(s => s.RankScore)
+                //            .Take(sentenceCount)
+                //            .OrderBy(s => s.Offset)
+                //            .Select(s => s.Text.Trim()));
+                //    break;
+                //}
             }
             if (!string.IsNullOrWhiteSpace(summary)) break;
         }
     }
     catch
     {
-        var sentences = System.Text.RegularExpressions.Regex
+        var sentences = Regex
             .Split(sample.Trim(), @"(?<=[\.!\?])\s+")
             .Where(s => !string.IsNullOrWhiteSpace(s))
-            .Take(3)
+            .Take(sentenceCount)
             .ToArray();
-        summary = sentences.Length > 0 ? string.Join(" ", sentences) : sample[..Math.Min(400, sample.Length)];
+        summary = sentences.Length > 0
+            ? string.Join(" ", sentences)
+            : sample[..Math.Min(400, sample.Length)];
     }
 
     return new
@@ -140,87 +201,65 @@ static async Task<object> AnalyzeTextAsync(string text, TextAnalyticsClient taCl
     };
 }
 
-// ---------- Startup ----------
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen(c => c.EnableAnnotations());
+//builder.Services.AddSwaggerGen(c => c.EnableAnnotations());
 builder.Services.AddControllers();
-
-// ✅ Add antiforgery so Ignore/Disable metadata is understood by middleware
 builder.Services.AddAntiforgery();
 
-string langEndpoint;
-string langKey;
-string diEndpoint;
-string diKey;
+string langEndpoint, langKey, diEndpoint, diKey, openAiEndpoint, openAiKey, openAiDeployment;
 
 var environment = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT");
 
 if (environment == "Development")
 {
-    // Load local .env if present
     string projectRoot = Directory.GetParent(AppContext.BaseDirectory)?.Parent?.Parent?.Parent?.FullName
                          ?? throw new InvalidOperationException("Unable to locate project root");
     string envPath = Path.Combine(projectRoot, "localvar.env");
-    if (File.Exists(envPath))
-    {
-        Env.Load(envPath);
-        Console.WriteLine($"Loaded environment variables from: {envPath}");
-    }
+    if (File.Exists(envPath)) Env.Load(envPath);
 
-    Console.WriteLine($"Environment: {environment}");
-    langEndpoint = Environment.GetEnvironmentVariable("AI_LANGUAGE_ENDPOINT")
-        ?? throw new InvalidOperationException("AI_LANGUAGE_ENDPOINT not set");
-    langKey = Environment.GetEnvironmentVariable("AI_LANGUAGE_KEY")
-        ?? throw new InvalidOperationException("AI_LANGUAGE_KEY not set");
-    diEndpoint = Environment.GetEnvironmentVariable("AI_DOCINTEL_ENDPOINT")
-        ?? throw new InvalidOperationException("AI_DOCINTEL_ENDPOINT not set");
-    diKey = Environment.GetEnvironmentVariable("AI_DOCINTEL_KEY")
-        ?? throw new InvalidOperationException("AI_DOCINTEL_KEY not set");
+    langEndpoint = Environment.GetEnvironmentVariable("AI_LANGUAGE_ENDPOINT") ?? throw new InvalidOperationException("AI_LANGUAGE_ENDPOINT not set");
+    langKey = Environment.GetEnvironmentVariable("AI_LANGUAGE_KEY") ?? throw new InvalidOperationException("AI_LANGUAGE_KEY not set");
+    diEndpoint = Environment.GetEnvironmentVariable("AI_DOCINTEL_ENDPOINT") ?? throw new InvalidOperationException("AI_DOCINTEL_ENDPOINT not set");
+    diKey = Environment.GetEnvironmentVariable("AI_DOCINTEL_KEY") ?? throw new InvalidOperationException("AI_DOCINTEL_KEY not set");
+
+    openAiEndpoint = Environment.GetEnvironmentVariable("OPENAI_ENDPOINT") ?? throw new InvalidOperationException("OPENAI_ENDPOINT not set");
+    openAiKey = Environment.GetEnvironmentVariable("OPENAI_KEY") ?? throw new InvalidOperationException("OPENAI_KEY not set");
+    openAiDeployment = Environment.GetEnvironmentVariable("OPENAI_DEPLOYMENT") ?? throw new InvalidOperationException("OPENAI_DEPLOYMENT not set");
+
 }
 else
 {
-    langEndpoint = Environment.GetEnvironmentVariable("AI_LANGUAGE_ENDPOINT")
-        ?? throw new InvalidOperationException("AI_LANGUAGE_ENDPOINT not set");
-    langKey = Environment.GetEnvironmentVariable("AI_LANGUAGE_KEY")
-        ?? throw new InvalidOperationException("AI_LANGUAGE_KEY not set");
-    diEndpoint = Environment.GetEnvironmentVariable("AI_DOCINTEL_ENDPOINT")
-        ?? throw new InvalidOperationException("AI_DOCINTEL_ENDPOINT not set");
-    diKey = Environment.GetEnvironmentVariable("AI_DOCINTEL_KEY")
-        ?? throw new InvalidOperationException("AI_DOCINTEL_KEY not set");
+    langEndpoint = Environment.GetEnvironmentVariable("AI_LANGUAGE_ENDPOINT") ?? throw new InvalidOperationException("AI_LANGUAGE_ENDPOINT not set");
+    langKey = Environment.GetEnvironmentVariable("AI_LANGUAGE_KEY") ?? throw new InvalidOperationException("AI_LANGUAGE_KEY not set");
+    diEndpoint = Environment.GetEnvironmentVariable("AI_DOCINTEL_ENDPOINT") ?? throw new InvalidOperationException("AI_DOCINTEL_ENDPOINT not set");
+    diKey = Environment.GetEnvironmentVariable("AI_DOCINTEL_KEY") ?? throw new InvalidOperationException("AI_DOCINTEL_KEY not set");
+
+    openAiEndpoint = Environment.GetEnvironmentVariable("OPENAI_ENDPOINT") ?? throw new InvalidOperationException("OPENAI_ENDPOINT not set");
+    openAiKey = Environment.GetEnvironmentVariable("OPENAI_KEY") ?? throw new InvalidOperationException("OPENAI_KEY not set");
+    openAiDeployment = Environment.GetEnvironmentVariable("OPENAI_DEPLOYMENT") ?? throw new InvalidOperationException("OPENAI_DEPLOYMENT not set");
+
 }
 
 builder.Services.AddSingleton(new TextAnalyticsClient(new Uri(langEndpoint), new AzureKeyCredential(langKey)));
 builder.Services.AddSingleton(new DocumentIntelligenceClient(new Uri(diEndpoint), new AzureKeyCredential(diKey)));
+builder.Services.AddSingleton(new OpenAIClient(new Uri(openAiEndpoint), new AzureKeyCredential(openAiKey)));
+builder.Services.AddSingleton(_ => openAiDeployment);
 
 var app = builder.Build();
 
 app.UseHttpsRedirection();
-
-// Swagger always on for Azure verification
-app.UseSwagger();
-app.UseSwaggerUI();
-
-// ✅ Add antiforgery middleware so endpoints with antiforgery metadata don't throw
-// (Place after auth if you add it later)
+//app.UseSwagger();
+//app.UseSwaggerUI();
 app.UseAntiforgery();
+app.UseDefaultFiles();     // looks for index.html
+app.UseStaticFiles();      // serves files from wwwroot/
+app.MapFallbackToFile("index.html");
 
-// Root + health
-app.MapGet("/", () => Results.Redirect("/swagger"))
-   .DisableAntiforgery(); // not necessary, but consistent with API-only app
-
-app.MapGet("/healthz", () => Results.Ok("OK"))
-   .DisableAntiforgery();
-
-// Controllers
-app.MapControllers();
-
-// ---------- POST /summarize/document (BinaryData overload; antiforgery disabled for Swagger form) ----------
+// ---------- POST /summarize/document ----------
 app.MapPost("/summarize/document",
-    async (IFormFile document,
-           DocumentIntelligenceClient diClient,
-           TextAnalyticsClient taClient) =>
+    async (IFormFile document, DocumentIntelligenceClient diClient, TextAnalyticsClient taClient, int? sentences) =>
     {
         if (document is null || document.Length == 0)
             return Results.BadRequest(new { error = "No file uploaded for 'document'." });
@@ -231,7 +270,7 @@ app.MapPost("/summarize/document",
 
         try
         {
-            await using var stream = document.OpenReadStream(); // no named args (broadest compatibility)
+            await using var stream = document.OpenReadStream();
             var response = await diClient.AnalyzeDocumentAsync(
                 WaitUntil.Completed,
                 "prebuilt-read",
@@ -265,7 +304,10 @@ app.MapPost("/summarize/document",
             });
         }
 
-        var analysis = await AnalyzeTextAsync(extractedText, taClient);
+        extractedText = NormalizeText(extractedText);
+
+        var n = ClampSentences(sentences);
+        var analysis = await AnalyzeTextAsync(extractedText, taClient, n);
         var totalMs = sw.ElapsedMilliseconds;
 
         return Results.Ok(new
@@ -280,24 +322,84 @@ app.MapPost("/summarize/document",
     .WithMetadata(new ConsumesAttribute("multipart/form-data"))
     .Produces(StatusCodes.Status200OK)
     .ProducesProblem(StatusCodes.Status400BadRequest)
-    .DisableAntiforgery(); // ✅ disable antiforgery on this form endpoint
+    .DisableAntiforgery();
 
-// ---------- POST /summarize/text (raw text body) ----------
+// ---------- POST /summarize/text ----------
 app.MapPost("/summarize/text",
-    async (HttpRequest req, TextAnalyticsClient taClient) =>
-    {
-        using var reader = new StreamReader(req.Body, leaveOpen: false);
-        var text = await reader.ReadToEndAsync();
+        async (HttpRequest req, TextAnalyticsClient taClient, int? sentences) =>
+        {
+            using var reader = new StreamReader(req.Body);
+            var text = await reader.ReadToEndAsync();
 
-        if (string.IsNullOrWhiteSpace(text))
-            return Results.BadRequest(new { error = "Body must contain non-empty text." });
+            if (string.IsNullOrWhiteSpace(text))
+                return Results.BadRequest(new { error = "Body must contain non-empty text." });
 
-        var analysis = await AnalyzeTextAsync(text, taClient);
-        return Results.Ok(analysis);
-    })
-    .WithMetadata(new ConsumesAttribute("text/plain"))
+            text = NormalizeText(text);
+            var n = ClampSentences(sentences);
+            var analysis = await AnalyzeTextAsync(text, taClient, n);
+
+            return Results.Ok(analysis);
+        })
+   // .WithMetadata(new ConsumesAttribute("text/plain"))
     .Produces(StatusCodes.Status200OK)
     .ProducesProblem(StatusCodes.Status400BadRequest)
-    .DisableAntiforgery(); // ✅ allow simple POSTs from Swagger without tokens
+    .DisableAntiforgery();
+
+
+app.MapPost("/summarize/abstractive", async (
+    HttpRequest req,
+    OpenAIClient openAIClient,
+    TextAnalyticsClient taClient,
+    int? sentences) =>
+{
+    using var reader = new StreamReader(req.Body);
+    var inputText = (await reader.ReadToEndAsync()) ?? string.Empty;
+
+    if (string.IsNullOrWhiteSpace(inputText))
+        return Results.BadRequest(new { error = "Body must contain non-empty text." });
+
+    var n = ClampSentences(sentences);
+    var sw = Stopwatch.StartNew();
+
+    var sample = inputText.Length > 15000 ? inputText[..15000] : inputText;
+    string? langName = null, langIso = null, taError = null;
+    string[] keywords = Array.Empty<string>();
+    try
+    {
+        var lang = await taClient.DetectLanguageAsync(sample);
+        langName = lang.Value.Name;
+        langIso = lang.Value.Iso6391Name;
+
+        var kp = await taClient.ExtractKeyPhrasesAsync(sample);
+        keywords = kp.Value
+            .Where(s => !string.IsNullOrWhiteSpace(s))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderByDescending(s => s.Length)
+            .Take(25)
+            .ToArray();
+    }
+    catch (Exception ex)
+    {
+        taError = $"Language/KeyPhrases failed: {ex.Message}";
+    }
+
+    // --- Abstractive summary (OpenAI) ---
+    var summary = await GetAbstractiveSummaryAsync(openAIClient, openAiDeployment, inputText, n);
+    
+    return Results.Ok(new
+    {
+        summary,
+        keywords,
+        detectedLanguage = langName,
+        detectedLanguageIso = langIso,
+        textPreview = sample.Length > 600 ? sample[..600] + "…" : sample,
+        textAnalyticsError = taError,
+       // timings = new { totalMs = sw.ElapsedMilliseconds }
+    });
+})
+.Produces(StatusCodes.Status200OK)
+.ProducesProblem(StatusCodes.Status400BadRequest)
+.DisableAntiforgery();
+
 
 app.Run();

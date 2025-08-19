@@ -6,4 +6,6 @@ public class AiSettings
     public string? DocumentIntelligenceKey { get; set; }
     public string? LanguageEndpoint { get; set; }
     public string? LanguageKey { get; set; }
+
+
 }

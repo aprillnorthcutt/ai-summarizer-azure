@@ -523,4 +523,3 @@ crash.log
 *.key
 *.crt
 >>>>>>> origin/main
-/Summarizer.Api/localvar.env
