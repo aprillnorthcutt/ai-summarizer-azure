@@ -3,7 +3,12 @@ import React, { useState } from "react";
 type TabProps = { label: string; children: React.ReactNode };
 type TabChild = React.ReactElement<TabProps>;
 
-export function Tabs({ children }: { children: TabChild[] | TabChild }) {
+type TabsProps = {
+  children: TabChild[] | TabChild;
+  setOutput?: (text: string) => void;
+};
+
+export function Tabs({ children, setOutput }: TabsProps) {
   const tabs = React.Children.toArray(children) as TabChild[];
   const [active, setActive] = useState(0);
 
@@ -13,7 +18,10 @@ export function Tabs({ children }: { children: TabChild[] | TabChild }) {
         {tabs.map((t, i) => (
           <button
             key={i}
-            onClick={() => setActive(i)}
+            onClick={() => {
+              setActive(i);
+              setOutput?.(""); // clear output if function provided
+            }}
             className={`px-3 py-2 ${
               i === active ? "border-b-2 font-semibold" : "opacity-70"
             }`}
