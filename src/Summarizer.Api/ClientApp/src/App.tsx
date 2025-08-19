@@ -234,6 +234,17 @@ async function handleAbstractiveSubmit() {
 )}
         </section>
       </main>
+	  <footer className="text-center text-sm text-gray-500 dark:text-gray-400 pb-6">
+      Built by April Northcutt ·{" "}
+      <a
+        href="https://github.com/aprillnorthcutt"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="underline hover:text-blue-600"
+      >
+        GitHub
+      </a>
+    </footer>
     </div>
   );
 }
