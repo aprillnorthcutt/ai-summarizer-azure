@@ -24,7 +24,7 @@ export default defineConfig({
     },
   },
   build: {
-    outDir: '../wwwroot',     // Where ASP.NET expects the build output
-    emptyOutDir: true,        // Clean wwwroot on each build
+    outDir: '../wwwroot',     
+    emptyOutDir: true,        
   },
 })
