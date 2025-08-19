@@ -146,6 +146,11 @@ static async Task<object> AnalyzeTextAsync(string text, TextAnalyticsClient taCl
                 var docResult = exResult.DocumentsResults.FirstOrDefault();
                 if (docResult != null && docResult.Sentences.Count > 0)
                 {
+                    foreach (var s in docResult.Sentences)
+                    {
+                        Console.WriteLine($"[RankScore: {s.RankScore}] {s.Text}");
+                    }
+
                     summary = string.Join(" ",
                         docResult.Sentences
                             .OrderByDescending(s => s.RankScore)
@@ -154,6 +159,21 @@ static async Task<object> AnalyzeTextAsync(string text, TextAnalyticsClient taCl
                             .Select(s => s.Text.Trim()));
                     break;
                 }
+                //if (docResult != null && docResult.Sentences.Count > 0)
+                //{
+                //    foreach (var s in docResult.Sentences)
+                //    {
+                //        Console.WriteLine($"[RankScore: {s.RankScore}] {s.Text}");
+                //    }
+
+                //    summary = string.Join(" ",
+                //        docResult.Sentences
+                //            .OrderByDescending(s => s.RankScore)
+                //            .Take(sentenceCount)
+                //            .OrderBy(s => s.Offset)
+                //            .Select(s => s.Text.Trim()));
+                //    break;
+                //}
             }
             if (!string.IsNullOrWhiteSpace(summary)) break;
         }
@@ -218,13 +238,12 @@ else
 
     openAiEndpoint = Environment.GetEnvironmentVariable("OPENAI_ENDPOINT") ?? throw new InvalidOperationException("OPENAI_ENDPOINT not set");
     openAiKey = Environment.GetEnvironmentVariable("OPENAI_KEY") ?? throw new InvalidOperationException("OPENAI_KEY not set");
-    openAiDeployment = Environment.GetEnvironmentVariable("OPENAI_DEPLOYMENT_NAME") ?? throw new InvalidOperationException("OPENAI_DEPLOYMENT_NAME not set");
+    openAiDeployment = Environment.GetEnvironmentVariable("OPENAI_DEPLOYMENT") ?? throw new InvalidOperationException("OPENAI_DEPLOYMENT not set");
 
 }
 
 builder.Services.AddSingleton(new TextAnalyticsClient(new Uri(langEndpoint), new AzureKeyCredential(langKey)));
 builder.Services.AddSingleton(new DocumentIntelligenceClient(new Uri(diEndpoint), new AzureKeyCredential(diKey)));
-
 builder.Services.AddSingleton(new OpenAIClient(new Uri(openAiEndpoint), new AzureKeyCredential(openAiKey)));
 builder.Services.AddSingleton(_ => openAiDeployment);
 
@@ -236,7 +255,7 @@ app.UseHttpsRedirection();
 app.UseAntiforgery();
 app.UseDefaultFiles();     // looks for index.html
 app.UseStaticFiles();      // serves files from wwwroot/
-app.MapFallbackToFile("index.html"); // SPA fallback
+app.MapFallbackToFile("index.html");
 
 // ---------- POST /summarize/document ----------
 app.MapPost("/summarize/document",
@@ -321,70 +340,66 @@ app.MapPost("/summarize/text",
 
             return Results.Ok(analysis);
         })
-    .WithMetadata(new ConsumesAttribute("text/plain"))
+   // .WithMetadata(new ConsumesAttribute("text/plain"))
     .Produces(StatusCodes.Status200OK)
     .ProducesProblem(StatusCodes.Status400BadRequest)
     .DisableAntiforgery();
 
-//app.MapPost("/summarize/abstractive", async (
-//    OpenAIClient openAIClient,
-//    [FromBody] AbstractiveRequest request) =>
-//{
-//    string deploymentName = "abstractive-gpt"; // update this if your deployment name is different
-//    string inputText = request.Text ?? string.Empty;
-
-//    string userPrompt = request.SentenceCount.HasValue
-//        ? $"Summarize the following text in exactly {request.SentenceCount.Value} sentence(s): {inputText}"
-//        : $"Summarize the following text clearly and concisely: {inputText}";
-
-//    var chatOptions = new ChatCompletionsOptions
-//    {
-//        Temperature = 0.5f,
-//        MaxTokens = 500
-//    };
-
-//    chatOptions.Messages.Add(new ChatMessage(ChatRole.System, "You are a helpful assistant that summarizes text."));
-//    chatOptions.Messages.Add(new ChatMessage(ChatRole.User, userPrompt));
-
-//    Response<ChatCompletions> response = await openAIClient.GetChatCompletionsAsync(deploymentName, chatOptions);
-//    string summary = response.Value.Choices[0].Message.Content;
-
-//    return Results.Ok(new { summary });
-//});
 
 app.MapPost("/summarize/abstractive", async (
+    HttpRequest req,
     OpenAIClient openAIClient,
-    [FromBody] AbstractiveRequest request) =>
+    TextAnalyticsClient taClient,
+    int? sentences) =>
 {
-    string deploymentName = "abstractive-gpt";
-    string inputText = request.Text ?? string.Empty;
+    using var reader = new StreamReader(req.Body);
+    var inputText = (await reader.ReadToEndAsync()) ?? string.Empty;
 
-    string userPrompt = request.SentenceCount.HasValue
-        ? $"Summarize the following text in exactly {request.SentenceCount.Value} sentence(s): {inputText}"
-        : $"Summarize the following text clearly and concisely: {inputText}";
+    if (string.IsNullOrWhiteSpace(inputText))
+        return Results.BadRequest(new { error = "Body must contain non-empty text." });
 
-    var chatOptions = new ChatCompletionsOptions
+    var n = ClampSentences(sentences);
+    var sw = Stopwatch.StartNew();
+
+    var sample = inputText.Length > 15000 ? inputText[..15000] : inputText;
+    string? langName = null, langIso = null, taError = null;
+    string[] keywords = Array.Empty<string>();
+    try
     {
-        Temperature = 0.5f,
-        MaxTokens = 500,
-        Messages =
-        {
-            new ChatMessage(ChatRole.System, "You are a helpful assistant that summarizes text."),
-            new ChatMessage(ChatRole.User, userPrompt)
-        }
-    };
+        var lang = await taClient.DetectLanguageAsync(sample);
+        langName = lang.Value.Name;
+        langIso = lang.Value.Iso6391Name;
 
-    var response = await openAIClient.GetChatCompletionsAsync(deploymentName, chatOptions);
-    string summary = response.Value.Choices[0].Message.Content;
+        var kp = await taClient.ExtractKeyPhrasesAsync(sample);
+        keywords = kp.Value
+            .Where(s => !string.IsNullOrWhiteSpace(s))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderByDescending(s => s.Length)
+            .Take(25)
+            .ToArray();
+    }
+    catch (Exception ex)
+    {
+        taError = $"Language/KeyPhrases failed: {ex.Message}";
+    }
 
-    return Results.Ok(new { summary });
-});
-
-
-
-// ---------- Serve React frontend ----------
-//app.MapFallbackToFile("index.html").DisableAntiforgery();
-
+    // --- Abstractive summary (OpenAI) ---
+    var summary = await GetAbstractiveSummaryAsync(openAIClient, openAiDeployment, inputText, n);
+    
+    return Results.Ok(new
+    {
+        summary,
+        keywords,
+        detectedLanguage = langName,
+        detectedLanguageIso = langIso,
+        textPreview = sample.Length > 600 ? sample[..600] + "…" : sample,
+        textAnalyticsError = taError,
+       // timings = new { totalMs = sw.ElapsedMilliseconds }
+    });
+})
+.Produces(StatusCodes.Status200OK)
+.ProducesProblem(StatusCodes.Status400BadRequest)
+.DisableAntiforgery();
 
 
 app.Run();

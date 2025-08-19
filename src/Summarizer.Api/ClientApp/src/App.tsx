@@ -1,5 +1,10 @@
 import React, { useEffect, useState } from "react";
-import { initAntiforgery, postSummarizeText, postSummarizeDocument } from "./api";
+import {
+  initAntiforgery,
+  postSummarizeText,
+  postSummarizeDocument,
+  postSummarizeAbstractive,
+} from "./api";
 
 function Header() {
   return (
@@ -29,20 +34,13 @@ function Hero() {
       <p className="mt-3 md:mt-4 text-base md:text-lg text-gray-600 dark:text-gray-300 max-w-2xl mx-auto">
         Paste text or upload a document. Get a clean, readable summary in seconds.
       </p>
-      <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-        Backed by the same API used in Swagger.
-      </p>
+      <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Backed by the same API used in Swagger.</p>
     </section>
   );
 }
 
 function Tabs({ active, setActive }: { active: number; setActive: (i: number) => void }) {
-  const labels = [
-    "Summarize Text",
-    "Summarize Document (.pdf, .png, .docx)",
-    "Abstractive",
-  ];
-
+  const labels = ["Summarize Text", "Summarize Document (.pdf, .png, .docx)", "Abstractive"];
   return (
     <div className="flex gap-2 mb-4">
       {labels.map((label, i) => (
@@ -73,24 +71,75 @@ export default function App() {
     initAntiforgery().catch(() => {});
   }, []);
 
+  // Normalize API responses (flat or { analysis: {...} })
+  function formatOutputFromData(data: any) {
+    const root = data?.analysis ?? data ?? {};
+    const summary: string = root.summary ?? "";
+    const keywords: string[] = root.keywords ?? [];
+    const parts: string[] = [];
+    if (summary) parts.push(summary);
+    if (keywords.length) parts.push(`\n\nKeywords: ${keywords.join(", ")}`);
+
+    const timings = data?.timings ?? root?.timings;
+    if (timings && typeof timings === "object") {
+      const ms = Object.entries(timings)
+        .map(([k, v]) => `${k}=${v}ms`)
+        .join(", ");
+      if (ms) parts.push(`\n\nTimings: ${ms}`);
+    }
+
+    const file = data?.file ?? root?.file;
+    if (file?.name) parts.push(`\nFile: ${file.name}${file.length ? ` (${file.length} bytes)` : ""}`);
+
+    return parts.length ? parts.join("") : JSON.stringify(data, null, 2);
+  }
+
   async function handleTextSubmit() {
-    setLoading(true);
-    setOutput("");
-    const res = await postSummarizeText(textInput);
-    const data = await res.json().catch(() => ({}));
-    setOutput(data.summary ?? JSON.stringify(data, null, 2));
-    setLoading(false);
+    try {
+      setLoading(true);
+      setOutput("");
+      const res = await postSummarizeText(textInput);
+      if (!res.ok) {
+        setOutput(await res.text());
+        return;
+      }
+      const data = await res.json().catch(() => ({}));
+      setOutput(formatOutputFromData(data));
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function handleFileSubmit() {
     if (!fileInput) return;
+    try {
+      setLoading(true);
+      setOutput("");
+      const res = await postSummarizeDocument(fileInput);
+      if (!res.ok) {
+        setOutput(await res.text());
+        return;
+      }
+      const data = await res.json().catch(() => ({}));
+      setOutput(formatOutputFromData(data));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+async function handleAbstractiveSubmit() {
+  try {
     setLoading(true);
     setOutput("");
-    const res = await postSummarizeDocument(fileInput);
+    const res = await postSummarizeAbstractive(textInput, 6); // tweak 6 as you like
+    if (!res.ok) { setOutput(await res.text()); return; }
     const data = await res.json().catch(() => ({}));
-    setOutput(data.summary ?? JSON.stringify(data, null, 2));
-    setLoading(false);
-  }
+    //setOutput(data.summary ?? JSON.stringify(data, null, 2));
+setOutput(formatOutputFromData(data));
+
+  } finally { setLoading(false); }
+}
+
 
   return (
     <div className="min-h-screen bg-gray-50 text-gray-900 dark:bg-gray-950 dark:text-gray-100">
@@ -101,12 +150,9 @@ export default function App() {
         <section className="mt-6 rounded-2xl border bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900">
           <Tabs active={activeTab} setActive={setActiveTab} />
 
-          {/* Tab content */}
           {activeTab === 0 && (
             <div>
-              <label className="mb-2 block text-sm text-gray-600 dark:text-gray-300">
-                Text to summarize
-              </label>
+              <label className="mb-2 block text-sm text-gray-600 dark:text-gray-300">Text to summarize</label>
               <textarea
                 className="w-full min-h-[180px] resize-vertical rounded-lg border border-gray-300 bg-white p-3 pt-4 text-gray-900 placeholder-gray-400 focus:border-indigo-500 focus:outline-none focus:ring focus:ring-indigo-500/30 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:placeholder-gray-500"
                 placeholder="Paste text here…"
@@ -125,9 +171,7 @@ export default function App() {
 
           {activeTab === 1 && (
             <div>
-              <label className="mb-2 block text-sm text-gray-600 dark:text-gray-300">
-                Upload a document
-              </label>
+              <label className="mb-2 block text-sm text-gray-600 dark:text-gray-300">Upload a document</label>
               <input
                 type="file"
                 accept=".pdf,.png,.jpg,.jpeg,.docx"
@@ -146,9 +190,7 @@ export default function App() {
 
           {activeTab === 2 && (
             <div>
-              <label className="mb-2 block text-sm text-gray-600 dark:text-gray-300">
-                Abstractive input
-              </label>
+              <label className="mb-2 block text-sm text-gray-600 dark:text-gray-300">Abstractive input</label>
               <textarea
                 className="w-full min-h-[180px] resize-vertical rounded-lg border border-gray-300 bg-white p-3 pt-4 text-gray-900 placeholder-gray-400 focus:border-indigo-500 focus:outline-none focus:ring focus:ring-indigo-500/30 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:placeholder-gray-500"
                 placeholder="Paste text here…"
@@ -156,7 +198,7 @@ export default function App() {
                 onChange={(e) => setTextInput(e.target.value)}
               />
               <button
-                onClick={handleTextSubmit}
+                onClick={handleAbstractiveSubmit}
                 className="mt-3 rounded-lg bg-indigo-600 px-4 py-2 text-white hover:bg-indigo-700 disabled:opacity-50"
                 disabled={loading || !textInput.trim()}
               >
@@ -165,7 +207,6 @@ export default function App() {
             </div>
           )}
 
-          {/* Output display */}
           {output && (
             <pre className="mt-6 whitespace-pre-wrap rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100">
               {output}
