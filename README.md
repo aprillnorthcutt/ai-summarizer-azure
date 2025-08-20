@@ -1,148 +1,120 @@
-![CI .Net Status](https://github.com/aprillnorthcutt/ai-summarizer-azure/actions/workflows/ci-dotnet.yml/badge.svg)
-![CI Terraform Status](https://github.com/aprillnorthcutt/ai-summarizer-azure/actions/workflows/ci-terraform.yml/badge.svg)
-![Status: In Progress](https://img.shields.io/badge/status-in--progress-yellow)
-![Terraform Version](https://img.shields.io/badge/Terraform-1.6.6-blue)
+# 🧠 AI-Powered Document Summarizer – Azure, .NET, and Terraform
+
+🔗 **Live Demo**: [KeywordVista App](https://keywordvista.azurewebsites.net)  
+🌐 **AI Tools Landing Page**: [AI Tools Hub](https://ai-tools-hub.azurewebsites.net)
 
 ---
 
-# 🧠 AI-Powered Document Summarizer (Azure + .NET + Terraform)
+## Overview
 
-This portfolio project demonstrates how to deliver an intelligent document summarization web app using **Azure Cognitive Services**, a custom **.NET Core API**, and **infrastructure-as-code with Terraform**.
+This project showcases an end-to-end AI-powered summarization solution built using **Azure Cognitive Services**, **.NET Web API**, and **Terraform-based infrastructure as code**. It was created as part of a technical portfolio to demonstrate delivery leadership, DevOps maturity, and applied AI in a cloud-native environment.
 
-The infrastructure, CI/CD pipeline, and application code were all developed by me to showcase hands-on proficiency in **Terraform-based IaC**, **Azure DevOps automation**, and **practical AI integration** — simulating how modern delivery teams build scalable, cloud-native solutions.
-
----
-
-## 🚀 **Try It Now – Live Demo**  
-
-🎯 **Test the AI-Powered Document Summarizer instantly:**  
-🔗 **[Click here to launch on Azure](https://keywordvista.azurewebsites.net/)**  
-
-> 💡 **How to use:**  
-> - **/summarize/document** → Upload `.png`, `.pdf`, or `.docx` files (more formats coming soon).  
-> - **/summarize/text** → Paste or type text directly into the text box.  
-> - Front end is **Swagger UI** for now — a dedicated UI is planned.
+It simulates real-world use cases where organizations must extract insight from complex documents for compliance, vendor risk review, or operational efficiency.
 
 ---
 
-## 💡 Use Case
+## 🎯 Purpose
 
-Designed for consulting-style scenarios where teams need to:
-
-- Automate vendor risk and compliance review  
-- Summarize complex documentation using AI  
-- Deploy scalable cloud infrastructure using DevOps best practices  
-
-> ✅ This use case mirrors real challenges in consulting, GRC, legal tech, and enterprise architecture—extracting actionable insights from dense documents to save time, reduce risk, and improve throughput.
+- **For Delivery Teams**: Showcases scalable infrastructure, DevOps automation, and cloud-native development.
+- **For Recruiters**: Demonstrates Azure expertise, Terraform, CI/CD pipelines, and full-stack delivery.
+- **For Clients/Stakeholders**: Illustrates how AI can streamline document processing and surface key insights. 
 
 ---
 
-## 🔧 Tech Stack
+## 🛠️ Technologies Used
 
 | Layer            | Tools                                           |
 |------------------|--------------------------------------------------|
-| Infra as Code    | Terraform (modular structure, remote backend)   |
-| Cloud Platform   | Azure (App Service, Cognitive Services, Storage)|
-| AI Services      | Azure Cognitive Services / Azure OpenAI         |
-| Backend API      | .NET 7 Web API                                  |
-| Frontend         | Razor Pages *(planned enhancement)*             |
-| Observability    | Azure Application Insights                      |
-| CI/CD            | GitHub Actions & Azure DevOps                   |
+| Infrastructure   | Terraform, Azure CLI                            |
+| Cloud Services   | Azure App Service, Cognitive Services, Storage  |
+| API Backend      | .NET 7 Web API                                  |
+| AI Models        | Azure OpenAI, Azure Language Services           |
+| CI/CD            | GitHub Actions, Azure DevOps(in progress)       |
+| Monitoring       | Azure Application Insights                      |
+| Frontend         | React + Vite *(earlier Razor Pages plan dropped)*
 
 ---
 
-## 📂 Project Structure
+## 🧱 Architecture & Layout
 
-```text
+```
 ai-summarizer-azure/
-├── infra/             # Terraform modules and environments (dev/test/prod)
+├── infra/             # Terraform modules and environments
 │   └── envs/
-├── src/               # .NET API and test project
-├── pipelines/         # Azure DevOps pipeline definitions
-├── .github/workflows/ # GitHub Actions (CI/CD)
-├── docs/              # Diagrams, technical journey docs
-├── .gitignore
+├── src/               # .NET API and tests
+├── pipelines/         # Azure DevOps YAML pipeline
+├── .github/           # GitHub Actions workflows
+├── docs/              # Diagrams and guides
 └── README.md
 ```
 
 ---
 
-## 📦 Infrastructure Deployment (Terraform + Azure)
+## 📦 Project Features
 
-You can deploy infrastructure either locally or via GitHub Actions:
-
-- 💻 **Local CLI**: Use `terraform init` and `terraform apply` with environment-specific tfvars  
-- ☁️ **GitHub Actions**: On push or PR, run workflows defined in `.github/workflows`
-
-📁 [View the full deployment guide](docs/Deployment-guide.md)
-
----
-
-## 🔄 CI/CD Pipeline
-
-### ✅ GitHub Actions
-- Auto-plan/apply Terraform from PRs or commits  
-- Secrets managed via GitHub repository settings 
-- Split into 2 files for maintaiability between Terraform and App code. 
-- [View CI .Net workflow file](.github/workflows/ci-dotnet.yml)
-- [View CI Terraform workflow file](.github/workflows/ci-terraform.yml)
-
-### ✅ Azure DevOps (In Progress)
-- [pipelines/azure-pipeline.yml](pipelines/azure-pipeline.yml) provides a sample deploy pipeline  
-- Can be imported directly into Azure DevOps
-
-> ℹ️ Infra is deployed manually during development to reduce spend, but both CI/CD options simulate enterprise-ready workflows.
+| Feature                              | Status           |
+|--------------------------------------|------------------|
+| Modular Terraform IaC                | ✅ Complete       |
+| Azure Web App + Cognitive Services   | ✅ Complete       |
+| Extractive + Abstractive Summarizer  | ✅ Complete       |
+| GitHub Actions CI/CD (infra + app)   | ✅ Complete       |
+| Azure DevOps YAML pipeline           | ⏳ In Progress    |
+| React Frontend UI                    | ✅ Complete       |
+| Live Demo Hosted on Azure            | ✅ Live Now       |
 
 ---
 
-## 📈 What This Project Demonstrates
+## 🖥️ Demo Example
 
-- Delivery and CI/CD strategy using GitHub Actions and Azure DevOps
-- Secure, modular infrastructure using Terraform and service principals
-- Real-world use case simulating document AI automation
-- Leadership in technical planning, tooling, and architecture decisions
+The web app allows users to:
 
----
-
-## 📘 Project Journey Docs
-
-- [CI/CD + GitHub Flow](docs/GIT-GITHUB-CICD-JOURNEY.png)
-- [Azure Infrastructure Setup](docs/AZURE-INFRA-SETUP.png)
-- [Deployment Guide](docs/Deployment-guide.md)
-- [Architecture Diagram](docs/Azure%20Local%20Setup.png)
+- Paste raw text or upload a document (PDF, PNG, DOCX)
+- Select **Extractive** (sentence selection) or **Abstractive** (rephrased summary) mode
+- View the AI-generated summary and key phrases
+- Explore front-end UX backed by real Azure services
 
 ---
 
-## 📈 Project Status
+## 📘 Sample Architecture & Pipelines
 
-| Feature                    | Status   |
-|----------------------------|----------|
-| Terraform Infra Modules    | ✅ Done  |
-| GitHub Actions CI/CD       | ✅ Done  |
-| Azure DevOps Pipelines     | ⏳ In Progress |
-| .NET API (PDF Upload + AI) | ⏳ In Progress |
-| Frontend UI (optional)     | ⏳ Planned |
-| Architecture Diagram       | ⏳ In Progress |
-| Live Demo                  | 🔜 Optional (for review/demo)
+| Resource              | Link |
+|-----------------------|------|
+| Deployment Guide      | `docs/Deployment-guide.md` |
+| CI/CD Architecture    | `docs/GIT-GITHUB-CICD-JOURNEY.png` |
+| Infra Architecture    | `docs/AZURE-INFRA-SETUP.png` |
+| System Diagram        | `docs/Azure Local Setup.png` |
 
 ---
 
-## 👩‍💻 About the Author
+## 🧠 Strategic Commentary
 
-Hi, I’m **April Northcutt**, a Software Engineering Manager with deep experience in Azure modernization, DevOps, and delivery leadership.
+This project simulates enterprise cloud delivery—modularized IaC, backend AI orchestration, frontend UX integration, and full CI/CD pipelines. It demonstrates not only code execution but real-world DevOps habits such as environment separation, observability, and progressive rollout readiness.
+
+It’s structured to mirror how engineering leaders plan, execute, and optimize platforms across cloud and AI initiatives.
+
+---
+
+## 🚀 Future Enhancements
+
+- Terraform deployment via Azure DevOps pipelines  
+- Expand summarizer with translation & sentiment analysis  
+- Add document download & preview features  
+- Apply Azure RBAC & identity controls to API endpoints  
+
+---
+
+## 👤 About the Creator
+
+**April Northcutt**  
+Hi, I’m April Northcutt, a Software Engineering Manager with deep experience in Azure modernization, DevOps, and delivery leadership.
 
 Before transitioning into platform strategy and technical leadership roles, I spent over a decade building backend and full-stack applications using C#, ASP.NET, SQL Server, and modern DevOps practices.
 
 I specialize in uncovering inefficiencies, automating processes, and aligning technical delivery with business outcomes.
 
-> *Note: My LinkedIn reflects only a portion of my consulting and engineering background.*
+> Note: My LinkedIn reflects only a portion of my consulting and engineering background.
 
-🔗 [LinkedIn](https://www.linkedin.com/in/aprillnorthcutt) | [GitHub](https://github.com/aprillnorthcutt)
-
----
-
-## 🏅 Certifications
-
+🏅 **Certifications**  
 ✅ Azure Developer Associate (AZ-204)  
 ✅ Azure Administrator Associate (AZ-104)  
 ✅ AI Fundamentals (AI-900)  
@@ -156,4 +128,5 @@ I specialize in uncovering inefficiencies, automating processes, and aligning te
 
 ## 📄 License
 
-MIT – feel free to fork or adapt for your own DevOps learning.
+MIT License.  
+You are free to adapt, extend, and integrate this work into your own delivery workflows.
